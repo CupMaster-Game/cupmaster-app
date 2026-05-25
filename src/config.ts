@@ -1,0 +1,47 @@
+import { config as loadDotenv } from 'dotenv';
+import { z } from 'zod';
+
+loadDotenv();
+
+const configSchema = z.object({
+  NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+  PORT: z.coerce.number().int().min(1).max(65535).default(3000),
+  HOST: z.string().default('0.0.0.0'),
+  JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
+  SIWE_DOMAINS: z.string().default('localhost'),
+  DATABASE_URL: z.string().min(1),
+  ENCRYPTED_PASS: z.string().min(1, 'ENCRYPTED_PASS is required'),
+  ENCRYPTED_SIGNER_PRIVATE_KEY: z.string().min(1, 'ENCRYPTED_SIGNER_PRIVATE_KEY is required'),
+  FOOTBALL_DATA_API_KEY: z.string().min(1, 'FOOTBALL_DATA_API_KEY is required'),
+  FOOTBALL_DATA_API_BASE_URL: z.string().default('https://v3.football.api-sports.io'),
+});
+
+interface ConfigValues {
+  NODE_ENV: 'development' | 'production' | 'test';
+  PORT: number;
+  HOST: string;
+  JWT_SECRET: string;
+  SIWE_DOMAINS: string;
+  DATABASE_URL: string;
+  ENCRYPTED_PASS: string;
+  ENCRYPTED_SIGNER_PRIVATE_KEY: string;
+  FOOTBALL_DATA_API_KEY: string;
+  FOOTBALL_DATA_API_BASE_URL: string;
+  siweDomains: string[];
+}
+
+const parsed = configSchema.safeParse(process.env);
+
+if (!parsed.success) {
+  console.error('Invalid environment variables:');
+  console.error(z.treeifyError(parsed.error));
+  process.exit(1);
+}
+
+const config: ConfigValues = {
+  ...parsed.data,
+  siweDomains: parsed.data.SIWE_DOMAINS.split(',').map((d) => d.trim()),
+};
+
+export type Config = ConfigValues;
+export default config;
