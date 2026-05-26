@@ -1,6 +1,6 @@
 import { Trophy, Medal, Award } from 'lucide-react';
 import { Avatar } from '@/components/ui/Avatar';
-import { Flag } from '@/components/ui/Flag';
+import { TeamFlag } from '@/components/leaderboard/TeamFlag';
 import type { LeaderboardEntry } from '@/types';
 import { cn } from '@/lib/cn';
 
@@ -78,11 +78,11 @@ function Podium({
       <div>
         <p className="text-sm font-bold truncate max-w-[7rem]">{entry.name}</p>
         <div className="mt-1 flex justify-center">
-          <Flag code={entry.countryCode} size="sm" />
+          <TeamFlag flag={entry.flag} size="sm" />
         </div>
       </div>
       <p className="text-base font-bold text-brand-400">
-        {entry.points.toLocaleString()}
+        {entry.total_score.toLocaleString()}
         <span className="ml-1 text-[10px] text-text-muted">PTS</span>
       </p>
     </div>

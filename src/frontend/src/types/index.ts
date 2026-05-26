@@ -85,10 +85,11 @@ export type BadgeStatus = 'locked' | 'claimable' | 'claimed';
 
 export interface LeaderboardEntry {
   rank: number;
-  userId: string;
+  user_id: string;
   name: string;
-  countryCode: string;
-  points: number;
+  address: string;
+  flag: string;
+  total_score: number;
   isYou?: boolean;
 }
 

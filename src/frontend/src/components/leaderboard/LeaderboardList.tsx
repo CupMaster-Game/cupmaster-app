@@ -1,6 +1,6 @@
 import { Card } from '@/components/ui/Card';
 import { Avatar } from '@/components/ui/Avatar';
-import { Flag } from '@/components/ui/Flag';
+import { TeamFlag } from '@/components/leaderboard/TeamFlag';
 import type { LeaderboardEntry } from '@/types';
 import { cn } from '@/lib/cn';
 
@@ -17,7 +17,7 @@ export function LeaderboardList({ entries }: LeaderboardListProps) {
         <span>Points</span>
       </div>
       {entries.map((entry) => (
-        <Row key={entry.userId} entry={entry} />
+        <Row key={entry.user_id} entry={entry} />
       ))}
     </Card>
   );
@@ -57,10 +57,10 @@ function Row({
       <div className="flex items-center gap-2">
         <Avatar name={entry.name} size="sm" />
         <span className="text-sm font-semibold">{entry.name}</span>
-        <Flag code={entry.countryCode} size="sm" />
+        <TeamFlag flag={entry.flag} size="sm" />
       </div>
       <span className="text-sm font-bold text-brand-400">
-        {entry.points.toLocaleString()}
+        {entry.total_score.toLocaleString()}
       </span>
     </div>
   );
