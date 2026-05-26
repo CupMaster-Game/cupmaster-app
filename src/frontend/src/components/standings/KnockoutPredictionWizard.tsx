@@ -39,9 +39,9 @@ export function KnockoutPredictionWizard({
     [currentRound],
   );
 
-  function resolveSlot(m: KnockoutMatch, side: 'home' | 'away'): string | null {
-    const fromId = side === 'home' ? m.homeFromMatchId : m.awayFromMatchId;
-    const teamId = side === 'home' ? m.homeTeamId : m.awayTeamId;
+  function resolveSlot(m: KnockoutMatch, side: 'team1' | 'team2'): string | null {
+    const fromId = side === 'team1' ? m.team1FromMatchId : m.team2FromMatchId;
+    const teamId = side === 'team1' ? m.team1Id : m.team2Id;
     if (teamId) return teamId;
     if (fromId) return picks[fromId] ?? null;
     return null;
@@ -135,8 +135,8 @@ export function KnockoutPredictionWizard({
         </p>
         <div className="space-y-2">
           {roundMatches.map((m) => {
-            const homeId = resolveSlot(m, 'home');
-            const awayId = resolveSlot(m, 'away');
+            const team1Id = resolveSlot(m, 'team1');
+            const team2Id = resolveSlot(m, 'team2');
             return (
               <div
                 key={m.id}
@@ -147,17 +147,17 @@ export function KnockoutPredictionWizard({
                 </p>
                 <div className="grid grid-cols-2 gap-2">
                   <TeamPickButton
-                    teamId={homeId}
-                    selected={picks[m.id] === homeId}
+                    teamId={team1Id}
+                    selected={picks[m.id] === team1Id}
                     onClick={() => {
-                      if (homeId) pickWinner(m.id, homeId);
+                      if (team1Id) pickWinner(m.id, team1Id);
                     }}
                   />
                   <TeamPickButton
-                    teamId={awayId}
-                    selected={picks[m.id] === awayId}
+                    teamId={team2Id}
+                    selected={picks[m.id] === team2Id}
                     onClick={() => {
-                      if (awayId) pickWinner(m.id, awayId);
+                      if (team2Id) pickWinner(m.id, team2Id);
                     }}
                   />
                 </div>

@@ -22,10 +22,10 @@ export function KnockoutBracket() {
   }
 
   function renderMatch(m: KnockoutMatch) {
-    const homeId =
-      m.homeTeamId ?? (m.homeFromMatchId ? resolveTeam(m.homeFromMatchId) : null);
-    const awayId =
-      m.awayTeamId ?? (m.awayFromMatchId ? resolveTeam(m.awayFromMatchId) : null);
+    const team1Id =
+      m.team1Id ?? (m.team1FromMatchId ? resolveTeam(m.team1FromMatchId) : null);
+    const team2Id =
+      m.team2Id ?? (m.team2FromMatchId ? resolveTeam(m.team2FromMatchId) : null);
     const winnerId = knockoutPredictions[m.id]?.winnerTeamId ?? null;
 
     return (
@@ -34,13 +34,13 @@ export function KnockoutBracket() {
         className="rounded-xl border border-border-subtle bg-bg-subtle p-2"
       >
         <BracketSlot
-          teamId={homeId}
-          isWinner={winnerId !== null && winnerId === homeId}
+          teamId={team1Id}
+          isWinner={winnerId !== null && winnerId === team1Id}
         />
         <div className="my-1 h-px bg-border-subtle" />
         <BracketSlot
-          teamId={awayId}
-          isWinner={winnerId !== null && winnerId === awayId}
+          teamId={team2Id}
+          isWinner={winnerId !== null && winnerId === team2Id}
         />
       </div>
     );
@@ -78,7 +78,7 @@ function BracketSlot({
     return (
       <div className="flex items-center gap-2 px-1 py-1 text-xs text-text-faint">
         <span className="h-4 w-6 rounded bg-bg-elevated" />
-        TBD
+        TBA
       </div>
     );
   }

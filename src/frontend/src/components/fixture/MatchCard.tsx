@@ -8,6 +8,7 @@ import type {
 import { Card } from '@/components/ui/Card';
 import { formatTime } from '@/lib/date';
 import { cn } from '@/lib/cn';
+import { truncateTeamName } from '@/lib/team';
 
 interface MatchCardProps {
   fixture: ApiFixture;
@@ -39,8 +40,8 @@ export function MatchCard({ fixture, prediction, onPredictClick }: MatchCardProp
     prediction && actualOutcome ? prediction.pick === actualOutcome : null;
   const group = fixtureGroup(fixture);
   const hasTeams = team1 !== null && team2 !== null;
-  const team1Name = team1?.team_name ?? 'TBD';
-  const team2Name = team2?.team_name ?? 'TBD';
+  const team1Name = team1 ? truncateTeamName(team1.team_name) : 'TBD';
+  const team2Name = team2 ? truncateTeamName(team2.team_name) : 'TBD';
   const statusLabel = fixture.status_short ?? (isLive ? 'LIVE' : 'FT');
 
   return (

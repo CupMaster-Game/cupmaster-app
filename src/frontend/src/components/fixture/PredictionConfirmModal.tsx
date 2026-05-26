@@ -2,6 +2,7 @@ import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import type { ApiFixture, ApiFixtureTeam, MatchOutcome } from '@/types';
 import { formatLongDate, formatTime } from '@/lib/date';
+import { truncateTeamName } from '@/lib/team';
 
 interface PredictionConfirmModalProps {
   fixture: ApiFixture | null;
@@ -32,9 +33,9 @@ export function PredictionConfirmModal({
 
   const pickLabel =
     pick === 'team1'
-      ? `${team1.team_name} Win`
+      ? `${truncateTeamName(team1.team_name)} Win`
       : pick === 'team2'
-        ? `${team2.team_name} Win`
+        ? `${truncateTeamName(team2.team_name)} Win`
         : 'Draw';
 
   return (
@@ -84,7 +85,7 @@ function TeamCell({ team }: { team: ApiFixtureTeam }) {
         alt={team.team_name}
         className="h-12 w-12 object-contain"
       />
-      <span className="text-sm font-semibold">{team.team_name}</span>
+      <span className="text-sm font-semibold">{truncateTeamName(team.team_name)}</span>
     </div>
   );
 }

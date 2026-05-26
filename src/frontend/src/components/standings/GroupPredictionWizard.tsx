@@ -187,9 +187,9 @@ export function GroupPredictionWizard({
   );
 }
 
-export function GroupSummary({ group }: { group: GroupId }) {
+export function GroupSummary({ group }: { group: string }) {
   const { groupPredictions } = useAppStore();
-  const pred = groupPredictions[group];
+  const pred = groupPredictions[group as GroupId];
   if (!pred) return null;
   return (
     <div className="flex items-center gap-1.5">

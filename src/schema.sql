@@ -57,7 +57,7 @@ CREATE TABLE fixture_results (
     fixture_id        BIGINT      NOT NULL UNIQUE REFERENCES fixtures(fixture_id),
     status_short      TEXT        NOT NULL CHECK (status_short IN ('FT', 'AET', 'PEN')),
     team1_score       INTEGER     NOT NULL CHECK (team1_score >= 0),
-    team2_score       INTEGER     NOT NULL CHECK (team2_score >= 0),
+    team2_score       INTEGER     NOT NULL CHECK (team2_score >= 0)
 );
 
 -- Live results for fixtures, updated frequently during matches (updateable)
