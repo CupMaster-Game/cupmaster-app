@@ -30,32 +30,19 @@ export const gameRoutes = new Hono<AuthEnv>()
   .use(authMiddleware)
 
   // POST /game/start — begin a new game play session
-  .post('/start', async (c) => {
-    const { user_id } = c.var.user;
-
-    console.log(`[game/start] user=${user_id} ua=${c.req.header('user-agent') ?? '(none)'}`);
-
-    const tournamentId = await getActiveTournament();
-    const gamePlay = await startGamePlay(user_id, tournamentId, getClientIp(c));
-
-    if (!gamePlay) {
-      return c.json({ error: 'Not enough energy' }, 400);
-    }
-
-    return c.json({
-      game_play_id: gamePlay.game_play_id,
-      started_at: dateFromId(gamePlay.game_play_id),
-    });
-  })
-
-  // POST /game/end — finish a game play session with a score
   .post(
-    '/end',
+    '/start',
     validator('json', (value, c) => {
       const result = z
         .object({
-          game_play_id: z.string().min(1),
-          score: z.number().int().min(0).max(200_000),
+          game_type: z.union([
+            z.literal(101),
+            z.literal(102),
+            z.literal(103),
+            z.literal(201),
+            z.literal(202),
+            z.literal(203),
+          ]),
         })
         .safeParse(value);
       if (!result.success) {
@@ -65,9 +52,43 @@ export const gameRoutes = new Hono<AuthEnv>()
     }),
     async (c) => {
       const { user_id } = c.var.user;
-      const { game_play_id, score } = c.req.valid('json');
+      const { game_type } = c.req.valid('json');
 
-      const outcome = await endGamePlay(game_play_id, user_id, score);
+      console.log(`[game/start] user=${user_id} ua=${c.req.header('user-agent') ?? '(none)'}`);
+
+      const tournamentId = await getActiveTournament();
+      const gamePlay = await startGamePlay(user_id, tournamentId, game_type, getClientIp(c));
+
+      if (!gamePlay) {
+        return c.json({ error: 'Not enough energy' }, 400);
+      }
+
+      return c.json({
+        game_play_id: gamePlay.game_play_id,
+        started_at: dateFromId(gamePlay.game_play_id),
+      });
+    }
+  )
+
+  // POST /game/end — finish a game play session with a score
+  .post(
+    '/end',
+    validator('json', (value, c) => {
+      const result = z
+        .object({
+          game_play_id: z.string().min(1),
+        })
+        .safeParse(value);
+      if (!result.success) {
+        return c.json({ error: 'Invalid request body', details: result.error.issues }, 400);
+      }
+      return result.data;
+    }),
+    async (c) => {
+      const { user_id } = c.var.user;
+      const { game_play_id } = c.req.valid('json');
+
+      const outcome = await endGamePlay(game_play_id, user_id);
 
       if (!outcome.ok) {
         switch (outcome.error) {
@@ -77,8 +98,6 @@ export const gameRoutes = new Hono<AuthEnv>()
               400
             );
           case 'session_expired':
-          case 'time_too_short':
-          case 'too_few_line_clears':
             return c.json({ error: 'Suspicious activity' }, 422);
         }
       }

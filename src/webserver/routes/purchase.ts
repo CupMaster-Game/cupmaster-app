@@ -6,12 +6,12 @@ import cupmasterGameAbi from '../../abis/cupmaster-game.abi.ts';
 import { CUPMASTER_GAME_ADDRESS, PAYMENT_TOKENS } from '../../constants.ts';
 import { findTransactionByHash, processPurchase } from '../../db/purchases.ts';
 import { getBlock, getTransactionReceipt } from '../../utils/celo-rpc-reader.ts';
-import { type AuthEnv } from '../middleware/auth.ts';
+import { authMiddleware, type AuthEnv } from '../middleware/auth.ts';
 
 const VALID_ITEM_TYPES = new Set([1, 2, 3, 4, 5]);
 
 export const purchaseRoutes = new Hono<AuthEnv>()
-  //  .use(authMiddleware)
+  .use(authMiddleware)
 
   // POST /purchase/submit — submit a purchase transaction hash for verification
   .post(
@@ -28,10 +28,7 @@ export const purchaseRoutes = new Hono<AuthEnv>()
       return result.data;
     }),
     async (c) => {
-      const { user_id, address } = {
-        user_id: '3729246265054747223',
-        address: '0x41367424ed39a8e8b16375cb9c71ce6d24b9da48',
-      }; //c.var.user;
+      const { user_id, address } = c.var.user;
       const { tx_hash } = c.req.valid('json');
 
       // 1. Check for duplicate transaction
