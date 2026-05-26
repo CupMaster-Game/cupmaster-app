@@ -6,12 +6,21 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      '/api': 'http://localhost:3000',
+      '/api': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, ''),
+      },
+    },
+    fs: {
+      // Allow importing type-only modules from the backend (../../webserver, etc.)
+      allow: [path.resolve(__dirname, '../..')],
     },
   },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      '@backend': path.resolve(__dirname, '../'),
     },
   },
 });

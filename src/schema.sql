@@ -268,7 +268,7 @@ SELECT u.user_id,
        date_from_id(u.user_id) AS created_at
 FROM   users u
 JOIN LATERAL (
-    SELECT name, is_banned
+    SELECT name, flag, is_banned
     FROM   user_mutable_data
     WHERE  user_id = u.user_id
     ORDER BY user_change_id DESC
