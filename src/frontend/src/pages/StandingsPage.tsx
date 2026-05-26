@@ -107,6 +107,7 @@ export function StandingsPage() {
             title="Create Your Custom Standings"
             description="Predict how each group will finish and compete with others!"
             ctaLabel="Create Now"
+            disabled={loading || !!error || groups.length === 0}
             onCta={() => { setGroupWizardOpen(true); }}
           />
           {loading && (
@@ -124,7 +125,7 @@ export function StandingsPage() {
               {groups.map(({ groupName, teams: groupTeams }) => (
                 <div key={groupName} className="space-y-2">
                   <GroupTable group={groupName} teams={groupTeams} />
-                  <GroupSummary group={groupName} />
+                  <GroupSummary group={groupName} teams={groupTeams} />
                 </div>
               ))}
             </div>
@@ -132,6 +133,7 @@ export function StandingsPage() {
           <GroupPredictionWizard
             open={groupWizardOpen}
             onClose={() => { setGroupWizardOpen(false); }}
+            groups={groups}
           />
         </>
       )}

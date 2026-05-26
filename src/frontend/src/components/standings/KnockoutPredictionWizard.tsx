@@ -1,14 +1,15 @@
-import { useMemo, useState } from 'react';
-import { ChevronRight, Check, Trophy } from 'lucide-react';
-import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Flag } from '@/components/ui/Flag';
+import { Modal } from '@/components/ui/Modal';
 import { KNOCKOUT_BRACKET, type KnockoutMatch } from '@/data/standings';
 import { getTeam } from '@/data/teams';
-import { useAppStore } from '@/store/AppStore';
 import { cn } from '@/lib/cn';
+import { useAppStore } from '@/store/AppStore';
+import { Check, ChevronRight, Trophy } from 'lucide-react';
+import { useMemo, useState } from 'react';
 
 const ROUNDS: readonly { key: KnockoutMatch['round']; label: string }[] = [
+  { key: 'r32', label: 'Round of 32' },
   { key: 'r16', label: 'Round of 16' },
   { key: 'qf', label: 'Quarter-finals' },
   { key: 'sf', label: 'Semi-finals' },
@@ -20,10 +21,7 @@ interface KnockoutPredictionWizardProps {
   onClose: () => void;
 }
 
-export function KnockoutPredictionWizard({
-  open,
-  onClose,
-}: KnockoutPredictionWizardProps) {
+export function KnockoutPredictionWizard({ open, onClose }: KnockoutPredictionWizardProps) {
   const { setKnockoutWinner } = useAppStore();
   const [picks, setPicks] = useState<Record<string, string>>({});
   const [stepIdx, setStepIdx] = useState(0);
@@ -32,11 +30,8 @@ export function KnockoutPredictionWizard({
   const currentRound = ROUNDS[stepIdx];
 
   const roundMatches = useMemo(
-    () =>
-      currentRound
-        ? KNOCKOUT_BRACKET.filter((m) => m.round === currentRound.key)
-        : [],
-    [currentRound],
+    () => (currentRound ? KNOCKOUT_BRACKET.filter((m) => m.round === currentRound.key) : []),
+    [currentRound]
   );
 
   function resolveSlot(m: KnockoutMatch, side: 'team1' | 'team2'): string | null {
@@ -85,10 +80,8 @@ export function KnockoutPredictionWizard({
           {champion && (
             <p className="text-sm text-text-muted">
               You picked{' '}
-              <span className="font-semibold text-text-primary">
-                {getTeam(champion).name}
-              </span>{' '}
-              as your World Cup champion.
+              <span className="font-semibold text-text-primary">{getTeam(champion).name}</span> as
+              your World Cup champion.
             </p>
           )}
           <Button fullWidth onClick={close}>
@@ -138,10 +131,7 @@ export function KnockoutPredictionWizard({
             const team1Id = resolveSlot(m, 'team1');
             const team2Id = resolveSlot(m, 'team2');
             return (
-              <div
-                key={m.id}
-                className="rounded-2xl border border-border-subtle bg-bg-subtle p-3"
-              >
+              <div key={m.id} className="rounded-2xl border border-border-subtle bg-bg-subtle p-3">
                 <p className="mb-2 text-[11px] uppercase tracking-wider text-text-muted">
                   Match {m.id.replace(/[^0-9]/g, '') || 'Final'}
                 </p>
@@ -195,7 +185,7 @@ function TeamPickButton({
         'flex items-center gap-2 rounded-xl border px-3 py-3 text-sm font-semibold transition-all active:scale-[0.98]',
         selected
           ? 'border-brand-500 bg-brand-500/15 text-brand-300 shadow-glow-soft'
-          : 'border-border-default bg-bg-elevated text-text-primary hover:border-border-strong',
+          : 'border-border-default bg-bg-elevated text-text-primary hover:border-border-strong'
       )}
     >
       <Flag code={team.code} />
