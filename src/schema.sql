@@ -18,6 +18,7 @@ CREATE TABLE user_mutable_data (
     user_change_id  BIGINT    DEFAULT generate_id() PRIMARY KEY,
     user_id         BIGINT    NOT NULL REFERENCES users(user_id),
     name            TEXT      NOT NULL CHECK (char_length(name) >= 3 AND char_length(name) <= 50),
+    flag            TEXT      NOT NULL, -- same as teams.logo
     is_banned       BOOLEAN   NOT NULL DEFAULT FALSE
 );
 
@@ -262,6 +263,7 @@ SELECT u.user_id,
        u.user_source,
        u.wallet_info,
        umd.name,
+       umd.flag,
        umd.is_banned,
        date_from_id(u.user_id) AS created_at
 FROM   users u

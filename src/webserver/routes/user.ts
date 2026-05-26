@@ -25,6 +25,7 @@ const getCachedUserResponse = makeSmartCached(
       user_id: user.user_id,
       address: user.address,
       name: user.name,
+      flag: user.flag,
       user_source: user.user_source,
       is_banned: user.is_banned,
       created_at: user.created_at,
@@ -59,7 +60,12 @@ export const userRoutes = new Hono<AuthEnv>()
   .post(
     '/rename',
     validator('json', (value, c) => {
-      const result = z.object({ name: nameSchema }).safeParse(value);
+      const result = z
+        .object({
+          name: nameSchema,
+          flag: z.string().max(50, 'Flag url must be at most 50 characters'),
+        })
+        .safeParse(value);
       if (!result.success) {
         return c.json({ error: 'Invalid request body', details: result.error.issues }, 400);
       }
@@ -67,9 +73,9 @@ export const userRoutes = new Hono<AuthEnv>()
     }),
     async (c) => {
       const { address } = c.var.user;
-      const { name } = c.req.valid('json');
+      const { name, flag } = c.req.valid('json');
 
-      const result = await renameUser(address, name);
+      const result = await renameUser(address, name, flag);
       if (!result.success) {
         if (result.reason === 'user_not_found') {
           return c.json({ error: 'User not found. Please sign up first.' }, 404);

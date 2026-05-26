@@ -1,7 +1,7 @@
+import { SIGNUP_ENERGIES } from '../constants.ts';
 import { dateFromId } from '../utils/index.ts';
 import { makeSmartCached } from '../utils/smart-cache.ts';
 import { sql, withTransaction } from './index.ts';
-import { SIGNUP_ENERGIES } from '../constants.ts';
 
 // ---------------------------------------------------------------------------
 // Row types — mirror the schema exactly.
@@ -16,6 +16,7 @@ export interface UserRow {
   user_source: UserSource;
   wallet_info: string;
   name: string;
+  flag: string;
   is_banned: boolean;
   created_at: Date;
 }
@@ -33,7 +34,7 @@ export type UserWithNumbersRow = UserRow & {
 
 export async function findUserByAddress(address: string): Promise<UserRow | null> {
   const rows = await sql<UserRow[]>`
-    SELECT user_id, address, user_source, wallet_info, name, is_banned, created_at
+    SELECT user_id, address, user_source, wallet_info, name, flag, is_banned, created_at
     FROM   users_with_data
     WHERE  address = ${address.toLowerCase()}
   `;
@@ -147,6 +148,7 @@ export type CreateUserResult =
 export async function createUser(
   address: string,
   name: string,
+  flag: string,
   userSource: UserSource,
   walletInfo: string
 ): Promise<CreateUserResult> {
@@ -174,8 +176,8 @@ export async function createUser(
     const userId = userRows[0]!.user_id;
 
     await tx`
-      INSERT INTO user_mutable_data (user_id, name)
-      VALUES (${userId}, ${name})
+      INSERT INTO user_mutable_data (user_id, name, flag)
+      VALUES (${userId}, ${name}, ${flag})
     `;
     for (const gameType of [101, 102, 103, 201, 202, 203] as const) {
       await tx`
@@ -209,7 +211,11 @@ export type RenameResult =
  * the same transaction; a transaction-scoped advisory lock keyed on the name
  * serializes concurrent renames to the same target.
  */
-export async function renameUser(address: string, newName: string): Promise<RenameResult> {
+export async function renameUser(
+  address: string,
+  newName: string,
+  flag: string
+): Promise<RenameResult> {
   const lowerAddress = address.toLowerCase();
 
   return withTransaction<RenameResult>(async (tx) => {
@@ -242,8 +248,8 @@ export async function renameUser(address: string, newName: string): Promise<Rena
     }
 
     await tx`
-      INSERT INTO user_mutable_data (user_id, name, is_banned)
-      VALUES (${userId}, ${newName}, ${isBanned})
+      INSERT INTO user_mutable_data (user_id, name, flag, is_banned)
+      VALUES (${userId}, ${newName}, ${flag} ${isBanned})
     `;
 
     return { success: true };

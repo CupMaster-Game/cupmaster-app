@@ -174,6 +174,7 @@ export const authRoutes = new Hono()
       const result = siweBodySchema
         .extend({
           name: nameSchema,
+          flag: z.string().max(50, 'Flag url must be at most 50 characters'),
           user_source: userSourceSchema,
           wallet_info: walletInfoSchema,
         })
@@ -184,7 +185,7 @@ export const authRoutes = new Hono()
       return result.data;
     }),
     async (c) => {
-      const { message, signature, name, user_source, wallet_info } = c.req.valid('json');
+      const { message, signature, name, flag, user_source, wallet_info } = c.req.valid('json');
       const verified = await verifySiwe(message, signature);
       if ('error' in verified) {
         return c.json({ error: verified.error }, verified.status);
@@ -196,7 +197,7 @@ export const authRoutes = new Hono()
       }
 
       // createUser checks name uniqueness against latest names atomically.
-      const result = await createUser(verified.address, name, user_source, wallet_info);
+      const result = await createUser(verified.address, name, flag, user_source, wallet_info);
       if (!result.success) {
         return c.json({ error: 'This name is already taken.' }, 409);
       }
