@@ -1,12 +1,10 @@
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
-import { Flag } from '@/components/ui/Flag';
-import type { Match, MatchOutcome } from '@/types';
-import { getTeam } from '@/data/teams';
+import type { ApiFixture, ApiFixtureTeam, MatchOutcome } from '@/types';
 import { formatLongDate, formatTime } from '@/lib/date';
 
 interface PredictionConfirmModalProps {
-  match: Match | null;
+  fixture: ApiFixture | null;
   pick: MatchOutcome | null;
   open: boolean;
   onClose: () => void;
@@ -14,13 +12,13 @@ interface PredictionConfirmModalProps {
 }
 
 export function PredictionConfirmModal({
-  match,
+  fixture,
   pick,
   open,
   onClose,
   onConfirm,
 }: PredictionConfirmModalProps) {
-  if (!match || !pick) {
+  if (!fixture || !pick || !fixture.team1 || !fixture.team2) {
     return (
       <Modal open={open} onClose={onClose} title="Confirm Prediction">
         <div />
@@ -28,15 +26,15 @@ export function PredictionConfirmModal({
     );
   }
 
-  const home = getTeam(match.homeTeamId);
-  const away = getTeam(match.awayTeamId);
-  const kickoff = new Date(match.kickoff);
+  const team1 = fixture.team1;
+  const team2 = fixture.team2;
+  const kickoff = new Date(fixture.match_time);
 
   const pickLabel =
-    pick === 'home'
-      ? `${home.name} Win`
-      : pick === 'away'
-        ? `${away.name} Win`
+    pick === 'team1'
+      ? `${team1.team_name} Win`
+      : pick === 'team2'
+        ? `${team2.team_name} Win`
         : 'Draw';
 
   return (
@@ -61,15 +59,9 @@ export function PredictionConfirmModal({
         </p>
         <div className="rounded-2xl border border-border-subtle bg-bg-subtle p-4">
           <div className="flex items-center justify-between gap-3">
-            <div className="flex flex-1 flex-col items-center gap-2">
-              <Flag code={home.code} size="lg" />
-              <span className="text-sm font-semibold">{home.name}</span>
-            </div>
+            <TeamCell team={team1} />
             <span className="text-xs font-bold text-text-muted">VS</span>
-            <div className="flex flex-1 flex-col items-center gap-2">
-              <Flag code={away.code} size="lg" />
-              <span className="text-sm font-semibold">{away.name}</span>
-            </div>
+            <TeamCell team={team2} />
           </div>
         </div>
         <div className="rounded-2xl border border-brand-500/40 bg-brand-500/10 p-4 text-center">
@@ -81,5 +73,18 @@ export function PredictionConfirmModal({
         </p>
       </div>
     </Modal>
+  );
+}
+
+function TeamCell({ team }: { team: ApiFixtureTeam }) {
+  return (
+    <div className="flex flex-1 flex-col items-center gap-2">
+      <img
+        src={`/assets/team-logos/${team.logo}`}
+        alt={team.team_name}
+        className="h-12 w-12 object-contain"
+      />
+      <span className="text-sm font-semibold">{team.team_name}</span>
+    </div>
   );
 }

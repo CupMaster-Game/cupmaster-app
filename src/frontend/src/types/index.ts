@@ -19,35 +19,38 @@ export interface Team {
   group: GroupId;
 }
 
-export type MatchStage =
-  | 'group'
-  | 'r32'
-  | 'r16'
-  | 'qf'
-  | 'sf'
-  | 'final'
-  | 'third';
-
-export type MatchOutcome = 'home' | 'draw' | 'away';
+export type MatchOutcome = 'team1' | 'draw' | 'team2';
 
 export type MatchStatus = 'scheduled' | 'live' | 'finished';
-
-export interface Match {
-  id: string;
-  stage: MatchStage;
-  group: GroupId | null;
-  kickoff: string; // ISO string
-  homeTeamId: string;
-  awayTeamId: string;
-  homeScore: number | null;
-  awayScore: number | null;
-  status: MatchStatus;
-}
 
 export interface MatchPrediction {
   matchId: string;
   pick: MatchOutcome;
   predictedAt: string;
+}
+
+export interface ApiFixtureTeam {
+  team_id: string;
+  team_name: string;
+  country_code: string;
+  logo: string;
+  group_name: string;
+}
+
+export interface ApiFixture {
+  match_number: number;
+  fixture_id: string | null;
+  match_time: string;
+  round_type: 'group' | 'knockout';
+  round: string;
+  venue_name: string;
+  venue_city: string;
+  status: MatchStatus;
+  status_short: string | null;
+  team1: ApiFixtureTeam | null;
+  team2: ApiFixtureTeam | null;
+  team1_score: number | null;
+  team2_score: number | null;
 }
 
 export interface GroupOrderPrediction {

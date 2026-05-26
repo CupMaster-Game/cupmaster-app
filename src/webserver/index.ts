@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import config from '../config.ts';
 import { authRoutes } from './routes/auth.ts';
+import { fixturesRoutes } from './routes/fixtures.ts';
 import { gameRoutes } from './routes/game.ts';
 import { leaderboardRoutes } from './routes/leaderboard.ts';
 import { purchaseRoutes } from './routes/purchase.ts';
@@ -21,7 +22,8 @@ const app = new Hono()
   .route('/purchase', purchaseRoutes)
   .route('/user_claims', userClaimsRoutes)
   .route('/leaderboard', leaderboardRoutes)
-  .route('/teams', teamsRoutes);
+  .route('/teams', teamsRoutes)
+  .route('/fixtures', fixturesRoutes);
 
 // Export the app type for use with hono/client on the frontend:
 //   import { hc } from 'hono/client'

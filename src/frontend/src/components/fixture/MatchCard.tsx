@@ -1,39 +1,56 @@
 import { Bell, Crown, Minus, Check, X } from 'lucide-react';
-import type { Match, MatchOutcome, MatchPrediction } from '@/types';
-import { getTeam } from '@/data/teams';
+import type {
+  ApiFixture,
+  ApiFixtureTeam,
+  MatchOutcome,
+  MatchPrediction,
+} from '@/types';
 import { Card } from '@/components/ui/Card';
-import { Flag } from '@/components/ui/Flag';
 import { formatTime } from '@/lib/date';
 import { cn } from '@/lib/cn';
 
 interface MatchCardProps {
-  match: Match;
+  fixture: ApiFixture;
   prediction?: MatchPrediction;
-  onPredictClick?: (match: Match, pick: MatchOutcome) => void;
+  onPredictClick?: (fixture: ApiFixture, pick: MatchOutcome) => void;
 }
 
-export function MatchCard({ match, prediction, onPredictClick }: MatchCardProps) {
-  const home = getTeam(match.homeTeamId);
-  const away = getTeam(match.awayTeamId);
-  const kickoff = new Date(match.kickoff);
-  const isFinished = match.status === 'finished';
+function fixtureGroup(fixture: ApiFixture): string | null {
+  if (fixture.round_type !== 'group') return null;
+  const group = fixture.team1?.group_name ?? fixture.team2?.group_name;
+  return group ?? null;
+}
+
+export function MatchCard({ fixture, prediction, onPredictClick }: MatchCardProps) {
+  const team1 = fixture.team1;
+  const team2 = fixture.team2;
+  const kickoff = new Date(fixture.match_time);
+  const isFinished = fixture.status === 'finished';
+  const isLive = fixture.status === 'live';
   const actualOutcome: MatchOutcome | null =
-    isFinished && match.homeScore !== null && match.awayScore !== null
-      ? match.homeScore > match.awayScore
-        ? 'home'
-        : match.homeScore < match.awayScore
-          ? 'away'
+    isFinished && fixture.team1_score !== null && fixture.team2_score !== null
+      ? fixture.team1_score > fixture.team2_score
+        ? 'team1'
+        : fixture.team1_score < fixture.team2_score
+          ? 'team2'
           : 'draw'
       : null;
   const wasCorrect =
     prediction && actualOutcome ? prediction.pick === actualOutcome : null;
+  const group = fixtureGroup(fixture);
+  const hasTeams = team1 !== null && team2 !== null;
+  const team1Name = team1?.team_name ?? 'TBD';
+  const team2Name = team2?.team_name ?? 'TBD';
+  const statusLabel = fixture.status_short ?? (isLive ? 'LIVE' : 'FT');
 
   return (
     <Card className="overflow-hidden">
       <div className="grid grid-cols-[80px_1fr_auto] items-center gap-3 px-4 pt-4">
         <div className="text-sm font-semibold text-text-secondary">
-          {isFinished ? (
-            <span className="text-brand-400">FT</span>
+          {isFinished || isLive ? (
+            <span className={cn(isLive ? 'text-accent-red' : 'text-brand-400')}>
+              {statusLabel}
+            </span>
           ) : (
             formatTime(kickoff)
           )}
@@ -41,31 +58,31 @@ export function MatchCard({ match, prediction, onPredictClick }: MatchCardProps)
         <div className="flex items-center justify-center gap-3">
           <div className="flex flex-1 items-center justify-end gap-2 text-right">
             <span className="text-sm font-semibold leading-tight">
-              {home.name}
+              {team1Name}
             </span>
-            <Flag code={home.code} />
+            <TeamLogo team={team1} />
           </div>
           <div className="flex w-16 flex-col items-center text-center">
-            {match.group && (
+            {group && (
               <span className="text-[10px] uppercase tracking-wider text-text-muted">
-                Group {match.group}
+                {group}
               </span>
             )}
             <span
               className={cn(
                 'text-base font-bold',
-                isFinished ? 'text-text-primary' : 'text-text-muted',
+                isFinished || isLive ? 'text-text-primary' : 'text-text-muted',
               )}
             >
-              {isFinished
-                ? `${match.homeScore ?? '-'} - ${match.awayScore ?? '-'}`
+              {isFinished || isLive
+                ? `${fixture.team1_score ?? '-'} - ${fixture.team2_score ?? '-'}`
                 : 'VS'}
             </span>
           </div>
           <div className="flex flex-1 items-center gap-2">
-            <Flag code={away.code} />
+            <TeamLogo team={team2} />
             <span className="text-sm font-semibold leading-tight">
-              {away.name}
+              {team2Name}
             </span>
           </div>
         </div>
@@ -80,15 +97,15 @@ export function MatchCard({ match, prediction, onPredictClick }: MatchCardProps)
 
       <div className="grid grid-cols-3 gap-2 p-3 pt-3">
         <PickButton
-          label={`${home.name} Win`}
+          label={`${team1Name} Win`}
           icon={<Crown className="h-3.5 w-3.5" />}
           color="brand"
-          active={prediction?.pick === 'home'}
-          actual={actualOutcome === 'home'}
+          active={prediction?.pick === 'team1'}
+          actual={actualOutcome === 'team1'}
           finished={isFinished}
-          wasCorrect={prediction?.pick === 'home' ? wasCorrect : null}
-          disabled={isFinished}
-          onClick={() => onPredictClick?.(match, 'home')}
+          wasCorrect={prediction?.pick === 'team1' ? wasCorrect : null}
+          disabled={isFinished || isLive || !hasTeams}
+          onClick={() => onPredictClick?.(fixture, 'team1')}
         />
         <PickButton
           label="Draw"
@@ -98,22 +115,42 @@ export function MatchCard({ match, prediction, onPredictClick }: MatchCardProps)
           actual={actualOutcome === 'draw'}
           finished={isFinished}
           wasCorrect={prediction?.pick === 'draw' ? wasCorrect : null}
-          disabled={isFinished}
-          onClick={() => onPredictClick?.(match, 'draw')}
+          disabled={isFinished || isLive || !hasTeams}
+          onClick={() => onPredictClick?.(fixture, 'draw')}
         />
         <PickButton
-          label={`${away.name} Win`}
+          label={`${team2Name} Win`}
           icon={<Crown className="h-3.5 w-3.5" />}
           color="blue"
-          active={prediction?.pick === 'away'}
-          actual={actualOutcome === 'away'}
+          active={prediction?.pick === 'team2'}
+          actual={actualOutcome === 'team2'}
           finished={isFinished}
-          wasCorrect={prediction?.pick === 'away' ? wasCorrect : null}
-          disabled={isFinished}
-          onClick={() => onPredictClick?.(match, 'away')}
+          wasCorrect={prediction?.pick === 'team2' ? wasCorrect : null}
+          disabled={isFinished || isLive || !hasTeams}
+          onClick={() => onPredictClick?.(fixture, 'team2')}
         />
       </div>
     </Card>
+  );
+}
+
+function TeamLogo({ team }: { team: ApiFixtureTeam | null }) {
+  if (!team) {
+    return (
+      <span
+        className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-bg-elevated text-[10px] font-bold text-text-muted"
+        aria-label="Team to be determined"
+      >
+        ?
+      </span>
+    );
+  }
+  return (
+    <img
+      src={`/assets/team-logos/${team.logo}`}
+      alt={team.team_name}
+      className="h-6 w-6 shrink-0 object-contain"
+    />
   );
 }
 
@@ -147,7 +184,6 @@ function PickButton({
         ? 'border-accent-blue/40 text-accent-blue'
         : 'border-border-default text-text-secondary';
 
-  // Result-state overrides (finished match)
   let stateStyle = '';
   let statusIcon: React.ReactNode = null;
 
