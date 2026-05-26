@@ -14,12 +14,9 @@ import type {
   KnockoutPrediction,
   MatchOutcome,
   MatchPrediction,
-  User,
 } from '@/types';
-import { CURRENT_USER } from '@/data/user';
 
 interface PersistedState {
-  user: User;
   predictions: Record<string, MatchPrediction>;
   groupPredictions: Partial<Record<GroupId, [string, string, string, string]>>;
   knockoutPredictions: Record<string, KnockoutPrediction>;
@@ -28,7 +25,6 @@ interface PersistedState {
 }
 
 interface AppStore extends PersistedState {
-  updateUser: (patch: Partial<Pick<User, 'name' | 'countryCode'>>) => void;
   setMatchPrediction: (matchId: string, pick: MatchOutcome) => void;
   setGroupOrder: (
     group: GroupId,
@@ -48,7 +44,6 @@ function loadInitial(): PersistedState {
     if (!raw) return defaultState();
     const parsed = JSON.parse(raw) as Partial<PersistedState>;
     return {
-      user: parsed.user ?? CURRENT_USER,
       predictions: parsed.predictions ?? {},
       groupPredictions: parsed.groupPredictions ?? {},
       knockoutPredictions: parsed.knockoutPredictions ?? {},
@@ -62,7 +57,6 @@ function loadInitial(): PersistedState {
 
 function defaultState(): PersistedState {
   return {
-    user: CURRENT_USER,
     predictions: {},
     groupPredictions: {},
     knockoutPredictions: {},
@@ -87,10 +81,6 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       // ignore storage failures (private mode, quota)
     }
   }, [state]);
-
-  const updateUser = useCallback<AppStore['updateUser']>((patch) => {
-    setState((prev) => ({ ...prev, user: { ...prev.user, ...patch } }));
-  }, []);
 
   const setMatchPrediction = useCallback<AppStore['setMatchPrediction']>(
     (matchId, pick) => {
@@ -149,7 +139,6 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   const value = useMemo<AppStore>(
     () => ({
       ...state,
-      updateUser,
       setMatchPrediction,
       setGroupOrder,
       setKnockoutWinner,
@@ -158,7 +147,6 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     }),
     [
       state,
-      updateUser,
       setMatchPrediction,
       setGroupOrder,
       setKnockoutWinner,

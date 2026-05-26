@@ -1,11 +1,14 @@
-import { Pencil, BadgeCheck, Trophy } from 'lucide-react';
+import { Pencil, Trophy } from 'lucide-react';
 import { Avatar } from '@/components/ui/Avatar';
-import { Flag } from '@/components/ui/Flag';
-import type { User } from '@/types';
+import type { AuthedUser } from '@/hooks/useAuth';
 
 interface ProfileHeaderProps {
-  user: User;
+  user: AuthedUser;
   onEdit: () => void;
+}
+
+function shortenAddress(addr: string): string {
+  return addr.slice(0, 6) + '…' + addr.slice(-4);
 }
 
 export function ProfileHeader({ user, onEdit }: ProfileHeaderProps) {
@@ -25,16 +28,17 @@ export function ProfileHeader({ user, onEdit }: ProfileHeaderProps) {
           </span>
         </button>
         <div className="flex-1">
-          <div className="flex items-center gap-1.5">
-            <h2 className="text-xl font-bold">{user.name}</h2>
-            {user.verified && (
-              <BadgeCheck className="h-5 w-5 text-brand-400" />
-            )}
-          </div>
-          <p className="text-sm text-text-muted">{user.handle}</p>
+          <h2 className="text-xl font-bold">{user.name}</h2>
+          <p className="font-mono text-xs text-text-muted">
+            {shortenAddress(user.address)}
+          </p>
           <div className="mt-1 flex items-center gap-1.5 text-sm">
-            <Flag code={user.countryCode} size="sm" />
-            <span className="text-text-secondary">{countryName(user.countryCode)}</span>
+            <img
+              src={'/assets/team-logos/' + user.flag}
+              alt=""
+              className="h-4 w-6 rounded-sm object-cover"
+            />
+            <span className="text-text-secondary">My team</span>
           </div>
         </div>
       </div>
@@ -42,15 +46,19 @@ export function ProfileHeader({ user, onEdit }: ProfileHeaderProps) {
         <Stat
           icon={<span className="text-base">⭐</span>}
           label="Total Points"
-          value={user.totalPoints.toLocaleString()}
+          value={user.stats.total_score.toLocaleString()}
           unit="PTS"
           accent="brand"
         />
         <Stat
           icon={<Trophy className="h-4 w-4 text-accent-gold" />}
           label="Global Ranking"
-          value={`#${user.globalRank.toLocaleString()}`}
-          unit="Top 2.1%"
+          value={
+            user.stats.global_rank === null
+              ? 'Unranked'
+              : `#${user.stats.global_rank.toLocaleString()}`
+          }
+          unit={user.stats.global_rank === null ? '—' : 'Worldwide'}
           accent="gold"
         />
       </div>
@@ -91,58 +99,4 @@ function Stat({
       </div>
     </div>
   );
-}
-
-function countryName(code: string): string {
-  // Lightweight ISO → name lookup for a curated set; falls back to the code.
-  const map: Record<string, string> = {
-    US: 'United States',
-    GB: 'United Kingdom',
-    BR: 'Brazil',
-    AR: 'Argentina',
-    FR: 'France',
-    DE: 'Germany',
-    ES: 'Spain',
-    IT: 'Italy',
-    PT: 'Portugal',
-    NL: 'Netherlands',
-    JP: 'Japan',
-    KR: 'South Korea',
-    CA: 'Canada',
-    MX: 'Mexico',
-    AU: 'Australia',
-    TR: 'Türkiye',
-    BE: 'Belgium',
-    HR: 'Croatia',
-    DK: 'Denmark',
-    SE: 'Sweden',
-    NO: 'Norway',
-    CH: 'Switzerland',
-    PL: 'Poland',
-    AT: 'Austria',
-    UY: 'Uruguay',
-    CO: 'Colombia',
-    CL: 'Chile',
-    EC: 'Ecuador',
-    PE: 'Peru',
-    PY: 'Paraguay',
-    MA: 'Morocco',
-    EG: 'Egypt',
-    NG: 'Nigeria',
-    ZA: 'South Africa',
-    GH: 'Ghana',
-    SN: 'Senegal',
-    CI: 'Ivory Coast',
-    CM: 'Cameroon',
-    TN: 'Tunisia',
-    DZ: 'Algeria',
-    IR: 'Iran',
-    SA: 'Saudi Arabia',
-    QA: 'Qatar',
-    CR: 'Costa Rica',
-    JM: 'Jamaica',
-    PA: 'Panama',
-    NZ: 'New Zealand',
-  };
-  return map[code] ?? code;
 }

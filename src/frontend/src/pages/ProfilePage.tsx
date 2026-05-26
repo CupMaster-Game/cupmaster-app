@@ -1,51 +1,57 @@
-import { useState } from 'react';
-import { Bell, Settings, Trophy, Target, Gamepad2 } from 'lucide-react';
-import { Card } from '@/components/ui/Card';
-import { ProfileHeader } from '@/components/profile/ProfileHeader';
 import { BadgeRow } from '@/components/profile/BadgeRow';
-import { RewardsList } from '@/components/profile/RewardsList';
 import { EditProfileModal } from '@/components/profile/EditProfileModal';
-import { BADGES } from '@/data/user';
-import { useAppStore } from '@/store/AppStore';
+import { ProfileHeader } from '@/components/profile/ProfileHeader';
+import { RewardsList } from '@/components/profile/RewardsList';
+import { Card } from '@/components/ui/Card';
+import { BADGE_LADDERS } from '@/data/user';
+import { useAuth } from '@/hooks/useAuth';
+import type { BadgeCategory, BadgeProgress } from '@/types';
+import { Gamepad2, Target, Trophy } from 'lucide-react';
+import { useMemo, useState } from 'react';
 
 export function ProfilePage() {
-  const { user, updateUser } = useAppStore();
+  const { user } = useAuth();
   const [editOpen, setEditOpen] = useState(false);
+
+  const badges = useMemo<BadgeProgress[]>(() => {
+    if (!user) return [];
+    const currentByCategory: Record<BadgeCategory, number> = {
+      predictions_made: user.stats.predictions_made,
+      // No backend counter yet for these; show 0 until tracked.
+      correct_predictions: 0,
+      games_played: user.stats.games_played,
+      daily_streak: 0,
+      points_earned: user.stats.total_score,
+    };
+    return BADGE_LADDERS.map((ladder) => ({
+      ...ladder,
+      current: currentByCategory[ladder.category],
+    }));
+  }, [user]);
+
+  if (!user) return null;
 
   return (
     <div className="space-y-4 pb-4">
-      <div className="flex items-center justify-end gap-2">
-        <button
-          type="button"
-          className="relative rounded-xl border border-border-subtle bg-bg-surface p-2.5 text-text-secondary hover:text-text-primary"
-          aria-label="Notifications"
-        >
-          <Bell className="h-5 w-5" />
-          <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-brand-500 ring-2 ring-bg-base" />
-        </button>
-        <button
-          type="button"
-          className="rounded-xl border border-border-subtle bg-bg-surface p-2.5 text-text-secondary hover:text-text-primary"
-          aria-label="Settings"
-        >
-          <Settings className="h-5 w-5" />
-        </button>
-      </div>
-
-      <ProfileHeader user={user} onEdit={() => { setEditOpen(true); }} />
+      <ProfileHeader
+        user={user}
+        onEdit={() => {
+          setEditOpen(true);
+        }}
+      />
 
       <Card>
         <div className="grid grid-cols-2 divide-x divide-border-subtle">
           <MiniStat
             icon={<Gamepad2 className="h-5 w-5 text-brand-400" />}
             label="Games Played"
-            value={user.gamesPlayed.toString()}
+            value={user.stats.games_played.toLocaleString()}
             sub="All Time"
           />
           <MiniStat
             icon={<Target className="h-5 w-5 text-brand-400" />}
             label="Predictions Made"
-            value={user.predictionsMade.toString()}
+            value={user.stats.predictions_made.toLocaleString()}
             sub="All Time"
           />
         </div>
@@ -55,9 +61,7 @@ export function ProfilePage() {
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-lg font-bold">Rewards</h2>
-            <p className="text-xs text-text-muted">
-              Claim points and prizes you've earned.
-            </p>
+            <p className="text-xs text-text-muted">Claim points and prizes you've earned.</p>
           </div>
         </div>
         <RewardsList />
@@ -74,7 +78,7 @@ export function ProfilePage() {
           </div>
         </div>
         <div className="space-y-2">
-          {BADGES.map((b) => (
+          {badges.map((b) => (
             <BadgeRow key={b.category} badge={b} />
           ))}
         </div>
@@ -82,10 +86,11 @@ export function ProfilePage() {
 
       <EditProfileModal
         open={editOpen}
-        onClose={() => { setEditOpen(false); }}
+        onClose={() => {
+          setEditOpen(false);
+        }}
         initialName={user.name}
-        initialCountryCode={user.countryCode}
-        onSave={(patch) => { updateUser(patch); }}
+        initialFlag={user.flag}
       />
     </div>
   );

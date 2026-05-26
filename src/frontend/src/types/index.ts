@@ -61,18 +61,6 @@ export interface KnockoutPrediction {
   winnerTeamId: string;
 }
 
-export interface User {
-  id: string;
-  name: string;
-  handle: string;
-  countryCode: string;
-  totalPoints: number;
-  globalRank: number;
-  gamesPlayed: number;
-  predictionsMade: number;
-  verified: boolean;
-}
-
 export type BadgeTier = 'bronze' | 'silver' | 'gold';
 
 export type BadgeCategory =

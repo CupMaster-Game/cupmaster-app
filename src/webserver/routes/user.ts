@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { validator } from 'hono/validator';
 import { z } from 'zod';
+import { getCachedLeaderboards } from '../../db/leaderboard.ts';
 import { getPendingPayouts } from '../../db/payouts.ts';
 import {
   findUserIdByAddress,
@@ -14,12 +15,16 @@ import { nameSchema } from './auth.ts';
 
 const getCachedUserResponse = makeSmartCached(
   async (userId: string) => {
-    const [user, inventory, pendingClaims] = await Promise.all([
+    const [user, inventory, pendingClaims, leaderboards] = await Promise.all([
       getUserWithNumbers(userId),
       getUserInventory(userId),
       getPendingPayouts(userId),
+      getCachedLeaderboards(),
     ]);
     if (!user) return null;
+
+    const overall = leaderboards?.overall ?? [];
+    const globalRank = overall.find((e) => e.user_id === userId)?.rank ?? null;
 
     return {
       user_id: user.user_id,
@@ -33,6 +38,7 @@ const getCachedUserResponse = makeSmartCached(
         games_played: user.games_played,
         predictions_made: user.predictions_made,
         total_score: user.total_score,
+        global_rank: globalRank,
       },
       inventory,
       pending_claims: pendingClaims,

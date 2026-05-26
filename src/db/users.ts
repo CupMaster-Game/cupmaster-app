@@ -98,14 +98,16 @@ export async function getUserWithNumbers(userId: string): Promise<UserWithNumber
       u.user_source,
       u.wallet_info,
       u.name,
+      u.flag,
       u.is_banned,
       u.created_at,
-      COALESCE(SUM(CASE WHEN un.game_type IN (101, 102, 103) THEN un.games_played END), 0) AS games_played,
-      COALESCE(SUM(CASE WHEN un.game_type IN (201, 202, 203) THEN un.games_played END), 0) AS predictions_made,
-      COALESCE(SUM(un.total_score), 0) AS total_score
+      COALESCE(SUM(CASE WHEN un.game_type IN (101, 102, 103) THEN un.games_played END), 0)::int AS games_played,
+      COALESCE(SUM(CASE WHEN un.game_type IN (201, 202, 203) THEN un.games_played END), 0)::int AS predictions_made,
+      COALESCE(SUM(un.total_score), 0)::int AS total_score
     FROM   users_with_data u
     LEFT JOIN user_numbers un ON un.user_id = u.user_id
     WHERE  u.user_id = ${userId}
+    GROUP BY u.user_id, u.address, u.user_source, u.wallet_info, u.name, u.flag, u.is_banned, u.created_at
   `;
   return rows[0] ?? null;
 }

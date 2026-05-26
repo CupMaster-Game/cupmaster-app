@@ -1,24 +1,11 @@
 import { Hono } from 'hono';
 import {
-  fetchOverallLeaderboard,
-  fetchActiveLeaderboard,
+  getCachedLeaderboards,
   type LeaderboardEntry,
 } from '../../db/leaderboard.ts';
-import { makeSmartCached } from '../../utils/smart-cache.ts';
 import { authMiddleware, type AuthEnv } from '../middleware/auth.ts';
 
 const TOP_N = 50;
-
-const getCachedLeaderboards = makeSmartCached(
-  async () => {
-    const [active, overall] = await Promise.all([
-      fetchActiveLeaderboard(),
-      fetchOverallLeaderboard(),
-    ]);
-    return { active, overall };
-  },
-  { cacheSeconds: 10, autoRefresh: true, fileBackupName: 'leaderboard' }
-);
 
 function findMyRank<T extends LeaderboardEntry>(list: T[], userId: string): T | null {
   return list.find((e) => e.user_id === userId) ?? null;

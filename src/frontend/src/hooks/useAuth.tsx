@@ -37,6 +37,7 @@ export interface AuthedUser {
     games_played: number;
     predictions_made: number;
     total_score: number;
+    global_rank: number | null;
   };
 }
 

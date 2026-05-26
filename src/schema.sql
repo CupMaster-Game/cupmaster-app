@@ -140,7 +140,7 @@ CREATE TABLE user_items (
     user_id               BIGINT      NOT NULL REFERENCES users(user_id),
     item_type             INT         NOT NULL,
     acquisition_type      TEXT        NOT NULL CHECK (acquisition_type IN ('buy_package', 'achievement_reward')),
-    buy_transaction_id    BIGINT      REFERENCES user_transactions(transaction_id),
+    buy_transaction_id    BIGINT      REFERENCES user_transactions(transaction_id)
 );
 
 -- Item usage records (no-update) (one per item, only for used items)

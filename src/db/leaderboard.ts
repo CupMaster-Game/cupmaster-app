@@ -1,3 +1,4 @@
+import { makeSmartCached } from '../utils/smart-cache.ts';
 import { sql } from './index.ts';
 
 // ---------------------------------------------------------------------------
@@ -56,3 +57,17 @@ export async function fetchOverallLeaderboard(): Promise<LeaderboardEntry[]> {
     ORDER BY rank, u.user_id
   `;
 }
+
+// Shared, auto-refreshing cache for both leaderboards. Used by /leaderboard for
+// the top-N + my-rank view and by /user to attach the signed-in user's
+// global_rank without a second query.
+export const getCachedLeaderboards = makeSmartCached(
+  async () => {
+    const [active, overall] = await Promise.all([
+      fetchActiveLeaderboard(),
+      fetchOverallLeaderboard(),
+    ]);
+    return { active, overall };
+  },
+  { cacheSeconds: 10, autoRefresh: true, fileBackupName: 'leaderboard' }
+);
