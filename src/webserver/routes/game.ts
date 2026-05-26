@@ -8,8 +8,11 @@ import {
   getActiveTournament,
   startGamePlay,
 } from '../../db/game-plays.ts';
+import { getRandomTriviaQuestions } from '../../db/trivia-questions.ts';
 import { dateFromId } from '../../utils/index.ts';
 import { authMiddleware, type AuthEnv } from '../middleware/auth.ts';
+
+const TRIVIA_QUESTIONS_PER_ROUND = 5;
 
 // Cloudflare sets CF-Connecting-IP on every proxied request. X-Forwarded-For is
 // a comma-separated chain (client, proxy1, proxy2, …); the leftmost entry is
@@ -28,6 +31,14 @@ function getClientIp(c: Context): string | null {
 
 export const gameRoutes = new Hono<AuthEnv>()
   .use(authMiddleware)
+
+  // GET /game/trivia/questions — fetch a fresh batch of trivia questions for a
+  // single round. `correct_answer` is omitted; the server evaluates answers at
+  // /game/end using the buffered 'trivia_answer' events.
+  .get('/trivia/questions', async (c) => {
+    const questions = await getRandomTriviaQuestions(TRIVIA_QUESTIONS_PER_ROUND);
+    return c.json({ questions });
+  })
 
   // POST /game/start — begin a new game play session
   .post(

@@ -179,6 +179,19 @@ CREATE TABLE tournament_total_scores (
   UNIQUE (user_id, tournament_id)
 );
 
+-- Football trivia questions (no-update, static data, seeded from football_trivia_500.csv)
+CREATE TABLE football_trivia_questions (
+    question_id    INTEGER     PRIMARY KEY,
+    category       TEXT        NOT NULL,
+    difficulty     TEXT        NOT NULL CHECK (difficulty IN ('Easy', 'Medium', 'Hard')),
+    question       TEXT        NOT NULL,
+    option_a       TEXT        NOT NULL,
+    option_b       TEXT        NOT NULL,
+    option_c       TEXT        NOT NULL,
+    option_d       TEXT        NOT NULL,
+    correct_answer CHAR(1)     NOT NULL CHECK (correct_answer IN ('A', 'B', 'C', 'D'))
+);
+
 -- User stats per gametype (updateable) (recreateable summary) (high-churn row → HOT-update friendly)
 CREATE TABLE user_numbers (
     user_id           BIGINT  REFERENCES users(user_id),

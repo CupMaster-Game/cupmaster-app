@@ -1,6 +1,7 @@
 import { dateFromId } from '../utils/index.ts';
 import { sql, withTransaction } from './index.ts';
 import { type GameTypeId } from '../constants.ts';
+import { countCorrectTriviaAnswers } from './trivia-questions.ts';
 
 // ---------------------------------------------------------------------------
 // Row types
@@ -83,11 +84,23 @@ export async function endGamePlay(
 ): Promise<EndGamePlayOutcome> {
   const startedAt = dateFromId(gamePlayId);
   await flushIngameEvents();
-  const gameType = 101; // TODO: get the type from game_plays row
+
+  const gameTypeRows = await sql<{ game_type: GameTypeId }[]>`
+    SELECT game_type
+    FROM   game_plays
+    WHERE  game_play_id = ${gamePlayId}
+      AND  user_id = ${userId}
+  `;
+  const gameType = gameTypeRows[0]?.game_type;
+  if (gameType === undefined) {
+    return { ok: false, error: 'invalid_session' };
+  }
 
   // TODO: game_type-specific validation rules
-  // Also score calculation should be server-side based on the events
-  const score = 1; // placeholder until we implement server-side scoring
+  // Server-side scoring: for trivia, count correct answers from buffered events
+  // already flushed above. Other game types fall back to a placeholder until
+  // their scoring rules are implemented.
+  const score = gameType === 101 ? await countCorrectTriviaAnswers(gamePlayId) : 1;
 
   const result = await withTransaction(async (tx) => {
     // Atomic insert: succeeds only if the game_play exists with the right
