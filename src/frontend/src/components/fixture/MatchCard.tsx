@@ -1,14 +1,9 @@
-import { Bell, Crown, Minus, Check, X } from 'lucide-react';
-import type {
-  ApiFixture,
-  ApiFixtureTeam,
-  MatchOutcome,
-  MatchPrediction,
-} from '@/types';
 import { Card } from '@/components/ui/Card';
-import { formatTime } from '@/lib/date';
 import { cn } from '@/lib/cn';
+import { formatTime } from '@/lib/date';
 import { truncateTeamName } from '@/lib/team';
+import type { ApiFixture, ApiFixtureTeam, MatchOutcome, MatchPrediction } from '@/types';
+import { Check, Crown, Minus, X } from 'lucide-react';
 
 interface MatchCardProps {
   fixture: ApiFixture;
@@ -36,8 +31,7 @@ export function MatchCard({ fixture, prediction, onPredictClick }: MatchCardProp
           ? 'team2'
           : 'draw'
       : null;
-  const wasCorrect =
-    prediction && actualOutcome ? prediction.pick === actualOutcome : null;
+  const wasCorrect = prediction && actualOutcome ? prediction.pick === actualOutcome : null;
   const group = fixtureGroup(fixture);
   const hasTeams = team1 !== null && team2 !== null;
   const team1Name = team1 ? truncateTeamName(team1.team_name) : 'TBD';
@@ -45,55 +39,39 @@ export function MatchCard({ fixture, prediction, onPredictClick }: MatchCardProp
   const statusLabel = fixture.status_short ?? (isLive ? 'LIVE' : 'FT');
 
   return (
-    <Card className="overflow-hidden">
-      <div className="grid grid-cols-[80px_1fr_auto] items-center gap-3 px-4 pt-4">
-        <div className="text-sm font-semibold text-text-secondary">
-          {isFinished || isLive ? (
-            <span className={cn(isLive ? 'text-accent-red' : 'text-brand-400')}>
-              {statusLabel}
-            </span>
-          ) : (
-            formatTime(kickoff)
+    <Card className="relative overflow-hidden">
+      <span
+        className={cn(
+          'absolute left-0 top-0 rounded-br-lg border-b border-r border-border-default bg-bg-elevated px-4 py-0.5 text-[11px] font-semibold',
+          isLive ? 'text-accent-red' : isFinished ? 'text-brand-400' : 'text-text-secondary'
+        )}
+      >
+        {isFinished || isLive ? statusLabel : formatTime(kickoff)}
+      </span>
+      <div className="flex items-center gap-3 px-4 pt-6">
+        <div className="flex flex-1 items-center justify-end gap-2 text-right">
+          <span className="text-sm font-semibold leading-tight">{team1Name}</span>
+          <TeamLogo team={team1} />
+        </div>
+        <div className="flex w-16 flex-col items-center text-center">
+          {group && (
+            <span className="text-[10px] uppercase tracking-wider text-text-muted">{group}</span>
           )}
-        </div>
-        <div className="flex items-center justify-center gap-3">
-          <div className="flex flex-1 items-center justify-end gap-2 text-right">
-            <span className="text-sm font-semibold leading-tight">
-              {team1Name}
-            </span>
-            <TeamLogo team={team1} />
-          </div>
-          <div className="flex w-16 flex-col items-center text-center">
-            {group && (
-              <span className="text-[10px] uppercase tracking-wider text-text-muted">
-                {group}
-              </span>
+          <span
+            className={cn(
+              'text-base font-bold',
+              isFinished || isLive ? 'text-text-primary' : 'text-text-muted'
             )}
-            <span
-              className={cn(
-                'text-base font-bold',
-                isFinished || isLive ? 'text-text-primary' : 'text-text-muted',
-              )}
-            >
-              {isFinished || isLive
-                ? `${fixture.team1_score ?? '-'} - ${fixture.team2_score ?? '-'}`
-                : 'VS'}
-            </span>
-          </div>
-          <div className="flex flex-1 items-center gap-2">
-            <TeamLogo team={team2} />
-            <span className="text-sm font-semibold leading-tight">
-              {team2Name}
-            </span>
-          </div>
+          >
+            {isFinished || isLive
+              ? `${fixture.team1_score ?? '-'} - ${fixture.team2_score ?? '-'}`
+              : 'VS'}
+          </span>
         </div>
-        <button
-          type="button"
-          aria-label="Notify"
-          className="rounded-lg p-1.5 text-text-muted hover:bg-bg-elevated hover:text-text-primary"
-        >
-          <Bell className="h-4 w-4" />
-        </button>
+        <div className="flex flex-1 items-center gap-2">
+          <TeamLogo team={team2} />
+          <span className="text-sm font-semibold leading-tight">{team2Name}</span>
+        </div>
       </div>
 
       <div className="grid grid-cols-3 gap-2 p-3 pt-3">
@@ -218,7 +196,7 @@ function PickButton({
         'flex items-center justify-center gap-1.5 rounded-xl border bg-bg-subtle px-2 py-2.5 text-xs font-semibold transition-all active:scale-[0.98]',
         colorStyle,
         stateStyle,
-        disabled && 'cursor-not-allowed',
+        disabled && 'cursor-not-allowed'
       )}
     >
       {statusIcon ?? icon}
