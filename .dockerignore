@@ -16,5 +16,5 @@ coverage
 data
 build
 pgdata
-
+src/frontend
 

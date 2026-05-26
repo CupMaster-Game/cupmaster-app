@@ -52,5 +52,5 @@
     //"sourceMap": true
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "build", "cache", "artifacts", "data", "deployments"]
+  "exclude": ["node_modules", "dist", "build", "cache", "artifacts", "data", "deployments", "src/frontend"]
 }

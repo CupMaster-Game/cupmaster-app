@@ -5,7 +5,18 @@ import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
 export default defineConfig([
-  { ignores: ['node_modules', 'dist', 'build', 'cache', 'artifacts', 'data', 'deployments'] },
+  {
+    ignores: [
+      'node_modules',
+      'dist',
+      'build',
+      'cache',
+      'artifacts',
+      'data',
+      'deployments',
+      'src/frontend',
+    ],
+  },
   {
     files: ['**/*.{js,mjs,cjs,ts,jsx,tsx}'],
     plugins: { js },

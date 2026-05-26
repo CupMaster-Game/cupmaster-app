@@ -1,0 +1,11 @@
+node_modules/
+.pnpm-store/
+.env
+build
+dist
+cache/
+artifacts/
+data/
+coverage*
+*.tsbuildinfo
+.DS_Store
