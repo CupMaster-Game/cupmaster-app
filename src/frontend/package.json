@@ -8,7 +8,7 @@
   "scripts": {
     "preinstall": "npx only-allow pnpm",
     "dev": "vite",
-    "build": "tsc -b --noEmit && vite build",
+    "build": "tsc -b --noEmit && VITE_API_URL=https://api.cupmaster.xyz vite build",
     "lint": "eslint .",
     "preview": "vite preview",
     "typecheck": "tsc -b --noEmit"
