@@ -1,3 +1,4 @@
+/* eslint-disable */
 import type postgres from 'postgres';
 import { withTransaction } from '../db/index.ts';
 

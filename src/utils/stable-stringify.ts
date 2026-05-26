@@ -74,8 +74,7 @@ export default function stableStringify(
     if (Array.isArray(node)) {
       const items: string[] = [];
       for (let i = 0; i < node.length; i++) {
-        const item =
-          stringify(node as unknown as object, i, node[i], level + 1) ?? JSON.stringify(null);
+        const item = stringify(node as object, i, node[i], level + 1) ?? JSON.stringify(null);
         items.push(indent + space + item);
       }
       return '[' + items.join(',') + indent + ']';
@@ -100,5 +99,5 @@ export default function stableStringify(
     return '{' + pairs.join(',') + indent + '}';
   }
 
-  return stringify({ '': obj } as object, '', obj, 0);
+  return stringify({ '': obj }, '', obj, 0);
 }

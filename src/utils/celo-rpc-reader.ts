@@ -41,7 +41,7 @@ export async function getCupmasterSeed(): Promise<`0x${string}`> {
   for (const client of clients) {
     try {
       const seed = await client.readContract({
-        address: CUPMASTER_GAME_ADDRESS as `0x${string}`,
+        address: CUPMASTER_GAME_ADDRESS,
         abi: cupmasterGameAbi,
         functionName: 'SEED',
       });

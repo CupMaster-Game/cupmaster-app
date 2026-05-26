@@ -1,5 +1,5 @@
-import { sql, withTransaction } from './index.ts';
 import { GAME_TYPE_IDS } from '../constants.ts';
+import { sql, withTransaction } from './index.ts';
 
 // ---------------------------------------------------------------------------
 // Queries
@@ -38,7 +38,7 @@ export async function processPurchase(
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     const transactionId = txRows[0]!.transaction_id;
 
-    if (GAME_TYPE_IDS.includes(itemTypeId as any)) {
+    if ((GAME_TYPE_IDS as readonly number[]).includes(itemTypeId)) {
       // 2a. Energy package — issue energy
       await tx`
         INSERT INTO energy_issuance (user_id, issuance_type, game_type, amount, transaction_id)

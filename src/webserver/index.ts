@@ -31,7 +31,7 @@ export function startWebServer(): Promise<void> {
   return new Promise((resolve) => {
     const server = createAdaptorServer({ fetch: app.fetch });
     server.listen(config.PORT, config.HOST, 10_000, () => {
-      console.log(`Server running at http://${config.HOST}:${config.PORT}`);
+      console.log(`Server running at http://${config.HOST}:${config.PORT.toString()}`);
       resolve();
     });
   });
