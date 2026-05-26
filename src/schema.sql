@@ -47,8 +47,8 @@ CREATE TABLE fixtures (
     fixture_id      BIGINT      DEFAULT generate_id() PRIMARY KEY,
     api_fixture_id  INTEGER     NOT NULL UNIQUE,  -- API fixture.id
     match_number    INTEGER     NOT NULL REFERENCES match_schedules(match_number),
-    team1_id        INTEGER     NOT NULL REFERENCES teams(team_id), -- home team on the API
-    team2_id        INTEGER     NOT NULL REFERENCES teams(team_id)  -- away team on the API
+    team1_id        BIGINT      NOT NULL REFERENCES teams(team_id), -- home team on the API
+    team2_id        BIGINT      NOT NULL REFERENCES teams(team_id)  -- away team on the API
 );
 
 -- Fixtures (no-update) (inserted when the match is completed)
