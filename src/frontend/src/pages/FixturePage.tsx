@@ -71,6 +71,26 @@ export function FixturePage() {
       .sort((a, b) => a.match_time.localeCompare(b.match_time));
   }, [fixtures, selected]);
 
+  // Extend the date scroller to cover every loaded fixture so the user can
+  // navigate to any tournament day (group stage through final). Falls back to
+  // the DateScroller defaults until fixtures load.
+  const dateRange = useMemo(() => {
+    if (fixtures.length === 0) return { before: undefined, after: undefined };
+    const DAY_MS = 1000 * 60 * 60 * 24;
+    const todayMs = today.getTime();
+    let min = todayMs;
+    let max = todayMs;
+    for (const f of fixtures) {
+      const t = startOfDay(new Date(f.match_time)).getTime();
+      if (t < min) min = t;
+      if (t > max) max = t;
+    }
+    return {
+      before: Math.max(7, Math.ceil((todayMs - min) / DAY_MS)),
+      after: Math.max(14, Math.ceil((max - todayMs) / DAY_MS)),
+    };
+  }, [fixtures, today]);
+
   const isOnToday = isSameDay(selected, today);
 
   return (
@@ -95,7 +115,12 @@ export function FixturePage() {
           </button>
         }
       />
-      <DateScroller selected={selected} onSelect={setSelected} />
+      <DateScroller
+        selected={selected}
+        onSelect={setSelected}
+        rangeBefore={dateRange.before}
+        rangeAfter={dateRange.after}
+      />
 
       <div className="space-y-3">
         <div className="flex items-center gap-2 text-sm font-semibold text-brand-400">
