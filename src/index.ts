@@ -1,8 +1,5 @@
-import { flushIngameEvents } from './db/game-plays.ts';
-import {
-  FETCH_FIXTURES_INTERVAL_MS,
-  runFetchFixturesJob,
-} from './jobs/fetch-fixtures.ts';
+import { flushIngameActions } from './db/game-plays.ts';
+import { FETCH_FIXTURES_INTERVAL_MS, runFetchFixturesJob } from './jobs/fetch-fixtures.ts';
 import {
   PROCESS_TOURNAMENT_INTERVAL_MS,
   runProcessTournamentJob,
@@ -10,7 +7,7 @@ import {
 import { maintainAsyncJob } from './utils/index.ts';
 import { startWebServer } from './webserver/index.ts';
 
-maintainAsyncJob(flushIngameEvents, 1_000).catch((err: unknown) => {
+maintainAsyncJob(flushIngameActions, 1_000).catch((err: unknown) => {
   console.error('flush ingame events error:', err);
   process.exit(1);
 });

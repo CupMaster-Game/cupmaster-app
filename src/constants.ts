@@ -30,13 +30,22 @@ export function getGameTypeName(gameTypeId: GameTypeId): string {
   return GAME_TYPE_NAMES[gameTypeId];
 }
 
+export const GAME_ENERGY_PRICES = {
+  101: '0.01',
+  102: '0.01',
+  103: '0.01',
+  201: '0',
+  202: '0.05',
+  203: '0.05',
+};
+
 export const SIGNUP_ENERGIES = {
   101: 1,
   102: 1,
   103: 1,
   201: 1000,
-  202: 1,
-  203: 1,
+  202: 0,
+  203: 0,
 };
 
 // ---------------------------------------------------------------------------

@@ -182,10 +182,12 @@ export async function createUser(
       VALUES (${userId}, ${name}, ${flag})
     `;
     for (const gameType of [101, 102, 103, 201, 202, 203] as const) {
-      await tx`
-        INSERT INTO energy_issuance (user_id, issuance_type, game_type, amount)
-        VALUES (${userId}, 'signup', ${gameType}, ${SIGNUP_ENERGIES[gameType]})
-      `;
+      if (SIGNUP_ENERGIES[gameType] > 0) {
+        await tx`
+          INSERT INTO energy_issuance (user_id, issuance_type, game_type, amount)
+          VALUES (${userId}, 'signup', ${gameType}, ${SIGNUP_ENERGIES[gameType]})
+        `;
+      }
       await tx`
         INSERT INTO user_numbers (user_id, game_type, energy)
         VALUES (${userId}, ${gameType}, ${SIGNUP_ENERGIES[gameType]})

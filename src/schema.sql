@@ -103,12 +103,13 @@ CREATE TABLE game_play_results (
     ended_at            TIMESTAMPTZ GENERATED ALWAYS AS (date_from_id(game_play_result_id)) STORED
 );
 
--- In-game events for analytics (no-update)
-CREATE TABLE game_ingame_events (
-    event_id           BIGINT      DEFAULT generate_id() PRIMARY KEY,
+-- In-game actions (no-update)
+-- Predictions will be stored here too. Prediction details will be stored as json in extra_data
+CREATE TABLE game_actions (
+    game_action_id     BIGINT      DEFAULT generate_id() PRIMARY KEY,
     game_play_id       BIGINT      NOT NULL REFERENCES game_plays(game_play_id),
-    event_time         TIMESTAMPTZ NOT NULL,
-    event_type         TEXT        NOT NULL,
+    action_time        TIMESTAMPTZ NOT NULL,
+    action_type        TEXT        NOT NULL,  -- submit_prediction ...
     intval             INT,
     textval            TEXT,
     extra_data         JSONB
@@ -179,7 +180,7 @@ CREATE TABLE tournament_total_scores (
   UNIQUE (user_id, tournament_id)
 );
 
--- Football trivia questions (no-update, static data, seeded from football_trivia_500.csv)
+-- Football trivia questions (no-update, static data)
 CREATE TABLE football_trivia_questions (
     question_id    INTEGER     PRIMARY KEY,
     category       TEXT        NOT NULL,

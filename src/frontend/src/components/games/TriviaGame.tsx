@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { useAccount } from 'wagmi';
-import { Trophy } from 'lucide-react';
-import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
+import { Modal } from '@/components/ui/Modal';
 import { getAuthedApi } from '@/lib/api';
 import { cn } from '@/lib/cn';
+import { Trophy } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useAccount } from 'wagmi';
 
 interface TriviaGameProps {
   open: boolean;
@@ -74,6 +74,7 @@ export function TriviaGame({ open, onClose }: TriviaGameProps) {
     void (async () => {
       try {
         const [qRes, startRes] = await Promise.all([
+          // these endpoints removed, game.football_trivia.start will return questions also
           authed.game.trivia.questions.$get(),
           authed.game.start.$post({ json: { game_type: 101 } }),
         ]);
@@ -115,11 +116,11 @@ export function TriviaGame({ open, onClose }: TriviaGameProps) {
     if (!authed) return;
     // Fire-and-forget: server buffers events and the next answer/end will pick
     // them up. We don't await so the UI doesn't stall on network latency.
-    void authed.game.event
+    void authed.game.action
       .$post({
         json: {
           game_play_id: gamePlayId,
-          event_type: 'trivia_answer',
+          action_type: 'trivia_answer',
           intval: q.question_id,
           textval: letter,
         },
@@ -254,13 +255,15 @@ export function TriviaGame({ open, onClose }: TriviaGameProps) {
               <button
                 key={opt.letter}
                 type="button"
-                onClick={() => { pickAnswer(opt.letter); }}
+                onClick={() => {
+                  pickAnswer(opt.letter);
+                }}
                 disabled={locked}
                 className={cn(
                   'flex w-full items-center justify-between rounded-xl border px-4 py-3 text-left text-sm font-medium transition-all',
                   !locked && 'border-border-default bg-bg-elevated hover:border-border-strong',
                   locked && isPicked && 'border-brand-500 bg-brand-500/15 text-brand-300',
-                  locked && !isPicked && 'opacity-50',
+                  locked && !isPicked && 'opacity-50'
                 )}
               >
                 <span>
@@ -280,4 +283,3 @@ export function TriviaGame({ open, onClose }: TriviaGameProps) {
     </Modal>
   );
 }
-

@@ -3,16 +3,13 @@ import { Hono } from 'hono';
 import { validator } from 'hono/validator';
 import { z } from 'zod';
 import {
-  bufferIngameEvent,
+  bufferIngameAction,
   endGamePlay,
   getActiveTournament,
   startGamePlay,
 } from '../../db/game-plays.ts';
-import { getRandomTriviaQuestions } from '../../db/trivia-questions.ts';
 import { dateFromId } from '../../utils/index.ts';
 import { authMiddleware, type AuthEnv } from '../middleware/auth.ts';
-
-const TRIVIA_QUESTIONS_PER_ROUND = 5;
 
 // Cloudflare sets CF-Connecting-IP on every proxied request. X-Forwarded-For is
 // a comma-separated chain (client, proxy1, proxy2, …); the leftmost entry is
@@ -32,28 +29,13 @@ function getClientIp(c: Context): string | null {
 export const gameRoutes = new Hono<AuthEnv>()
   .use(authMiddleware)
 
-  // GET /game/trivia/questions — fetch a fresh batch of trivia questions for a
-  // single round. `correct_answer` is omitted; the server evaluates answers at
-  // /game/end using the buffered 'trivia_answer' events.
-  .get('/trivia/questions', async (c) => {
-    const questions = await getRandomTriviaQuestions(TRIVIA_QUESTIONS_PER_ROUND);
-    return c.json({ questions });
-  })
-
   // POST /game/start — begin a new game play session
   .post(
     '/start',
     validator('json', (value, c) => {
       const result = z
         .object({
-          game_type: z.union([
-            z.literal(101),
-            z.literal(102),
-            z.literal(103),
-            z.literal(201),
-            z.literal(202),
-            z.literal(203),
-          ]),
+          game_type: z.union([z.literal(101), z.literal(102), z.literal(103)]),
         })
         .safeParse(value);
       if (!result.success) {
@@ -123,15 +105,14 @@ export const gameRoutes = new Hono<AuthEnv>()
     }
   )
 
-  // POST /game/event — record an in-game analytics event (pause, resume,
-  // line_clear, etc.). event_time is server-generated.
+  // POST /game/action — For recording ingame actions
   .post(
-    '/event',
+    '/action',
     validator('json', (value, c) => {
       const result = z
         .object({
           game_play_id: z.string().min(1),
-          event_type: z.string().min(1).max(64),
+          action_type: z.string().min(1).max(64),
           intval: z.number().int().nullish(),
           textval: z.string().max(1024).nullish(),
           extra_data: z.unknown().nullish(),
@@ -144,18 +125,18 @@ export const gameRoutes = new Hono<AuthEnv>()
     }),
     // eslint-disable-next-line @typescript-eslint/require-await
     async (c) => {
-      const { game_play_id, event_type, intval, textval, extra_data } = c.req.valid('json');
+      const { game_play_id, action_type, intval, textval, extra_data } = c.req.valid('json');
 
       // Buffered: returns immediately. Ownership and not-yet-ended checks are
       // applied at flush time (every ~1s) — bad rows are silently dropped.
-      const { event_time } = bufferIngameEvent(
+      const { action_time } = bufferIngameAction(
         game_play_id,
-        event_type,
+        action_type,
         intval ?? null,
         textval ?? null,
         extra_data ?? null
       );
 
-      return c.json({ event_time });
+      return c.json({ action_time });
     }
   );

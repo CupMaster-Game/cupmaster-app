@@ -1,7 +1,6 @@
+import { type GameTypeId } from '../constants.ts';
 import { dateFromId } from '../utils/index.ts';
 import { sql, withTransaction } from './index.ts';
-import { type GameTypeId } from '../constants.ts';
-import { countCorrectTriviaAnswers } from './trivia-questions.ts';
 
 // ---------------------------------------------------------------------------
 // Row types
@@ -68,7 +67,7 @@ export async function startGamePlay(
 
 export type EndGamePlayError =
   | 'invalid_session' // not found, wrong user, or already ended
-  | 'session_expired' // active play time exceeded 30-min cap
+  | 'session_expired'; // active play time exceeded 30-min cap
 
 export type EndGamePlayOutcome =
   | { ok: true; result: GamePlayResultRow }
@@ -78,12 +77,9 @@ export type EndGamePlayOutcome =
  * Ends a game play session.
  * On success inserts a game_play_results row and updates user_numbers (total_score).
  */
-export async function endGamePlay(
-  gamePlayId: string,
-  userId: string,
-): Promise<EndGamePlayOutcome> {
+export async function endGamePlay(gamePlayId: string, userId: string): Promise<EndGamePlayOutcome> {
   const startedAt = dateFromId(gamePlayId);
-  await flushIngameEvents();
+  await flushIngameActions();
 
   const gameTypeRows = await sql<{ game_type: GameTypeId }[]>`
     SELECT game_type
@@ -97,10 +93,7 @@ export async function endGamePlay(
   }
 
   // TODO: game_type-specific validation rules
-  // Server-side scoring: for trivia, count correct answers from buffered events
-  // already flushed above. Other game types fall back to a placeholder until
-  // their scoring rules are implemented.
-  const score = gameType === 101 ? await countCorrectTriviaAnswers(gamePlayId) : 1;
+  const score = 1;
 
   const result = await withTransaction(async (tx) => {
     // Atomic insert: succeeds only if the game_play exists with the right
@@ -150,60 +143,60 @@ export async function endGamePlay(
 // and flushed by a 1s timer (see index.ts)
 // ---------------------------------------------------------------------------
 
-interface BufferedIngameEvent {
+interface BufferedIngameAction {
   game_play_id: string;
-  event_time: Date;
-  event_type: string;
+  action_time: Date;
+  action_type: string;
   intval: number | null;
   textval: string | null;
   extra_data_json: string | null;
 }
 
-let ingameEventBuffer: BufferedIngameEvent[] = [];
+let ingameActionBuffer: BufferedIngameAction[] = [];
 let flushInFlight: Promise<void> | null = null;
 
-export function bufferIngameEvent(
+export function bufferIngameAction(
   gamePlayId: string,
-  eventType: string,
+  actionType: string,
   intval: number | null,
   textval: string | null,
   extraData: unknown
-): { event_time: Date } {
-  const event_time = new Date();
-  ingameEventBuffer.push({
+): { action_time: Date } {
+  const action_time = new Date();
+  ingameActionBuffer.push({
     game_play_id: gamePlayId,
-    event_time,
-    event_type: eventType,
+    action_time,
+    action_type: actionType,
     intval,
     textval,
     extra_data_json:
       extraData === null || extraData === undefined ? null : JSON.stringify(extraData),
   });
-  return { event_time };
+  return { action_time };
 }
 
-async function doFlushIngameEvents(): Promise<void> {
-  if (ingameEventBuffer.length === 0) return;
-  const batch = ingameEventBuffer;
-  ingameEventBuffer = [];
+async function doFlushIngameActions(): Promise<void> {
+  if (ingameActionBuffer.length === 0) return;
+  const batch = ingameActionBuffer;
+  ingameActionBuffer = [];
 
   try {
     await sql`
-      INSERT INTO game_ingame_events (game_play_id, event_time, event_type, intval, textval, extra_data)
+      INSERT INTO game_actions (game_play_id, action_time, actiion_type, intval, textval, extra_data)
       SELECT t.game_play_id::bigint,
-             t.event_time::timestamptz,
-             t.event_type,
+             t.action_time::timestamptz,
+             t.action_type,
              t.intval::int,
              t.textval,
              t.extra_data::jsonb
       FROM   UNNEST(
                ${batch.map((e) => e.game_play_id)}::text[],
-               ${sql.array(batch.map((e) => e.event_time))}::timestamptz[],
-               ${batch.map((e) => e.event_type)}::text[],
+               ${sql.array(batch.map((e) => e.action_time))}::timestamptz[],
+               ${batch.map((e) => e.action_type)}::text[],
                ${batch.map((e) => e.intval)}::int[],
                ${batch.map((e) => e.textval)}::text[],
                ${batch.map((e) => e.extra_data_json)}::text[]
-             ) AS t(game_play_id, event_time, event_type, intval, textval, extra_data)
+             ) AS t(game_play_id, action_time, action_type, intval, textval, extra_data)
       WHERE  EXISTS (
                SELECT 1 FROM game_plays gp
                WHERE  gp.game_play_id = t.game_play_id::bigint
@@ -222,9 +215,9 @@ async function doFlushIngameEvents(): Promise<void> {
  * Flushes the in-game event buffer. Concurrent calls share a single in-flight
  * flush so the bulk insert never overlaps itself.
  */
-export function flushIngameEvents(): Promise<void> {
+export function flushIngameActions(): Promise<void> {
   if (flushInFlight) return flushInFlight;
-  flushInFlight = doFlushIngameEvents().finally(() => {
+  flushInFlight = doFlushIngameActions().finally(() => {
     flushInFlight = null;
   });
   return flushInFlight;
@@ -241,7 +234,7 @@ export async function getActiveTournament(): Promise<string> {
   `;
 
   if (result[0] == null) {
-    throw new Error("Failed to fetch active tournament");
+    throw new Error('Failed to fetch active tournament');
   }
 
   return result[0].tournament_id;
