@@ -2,6 +2,12 @@ import type postgres from 'postgres';
 import { type GameTypeId } from '../constants.ts';
 import { sql, withTransaction } from './index.ts';
 
+// Match-the-Flag deck sizes. Each level uses N unique team flags, with every
+// flag appearing twice in the shuffled deck, so the deck has 2*N entries.
+export const MATCH_THE_FLAG_PAIRS_PER_LEVEL = [8, 15, 24] as const;
+const MATCH_THE_FLAG_MAX_PAIRS = Math.max(...MATCH_THE_FLAG_PAIRS_PER_LEVEL);
+const MATCH_THE_FLAG_POINTS_PER_PAIR = 2;
+
 type Sql = postgres.Sql | postgres.ReservedSql | postgres.TransactionSql;
 
 // ---------------------------------------------------------------------------
@@ -96,6 +102,61 @@ export async function insertGameAction(
   `;
 }
 
+export interface MatchTheFlagTeam {
+  team_id: string;
+  team_name: string;
+  logo: string;
+}
+
+export interface MatchTheFlagDeck {
+  level1: string[];
+  level2: string[];
+  level3: string[];
+}
+
+export interface MatchTheFlagStart {
+  selected_flags: MatchTheFlagDeck;
+  teams: MatchTheFlagTeam[];
+}
+
+function buildDeck(teamIds: readonly string[], pairs: number): string[] {
+  const withKeys = [...teamIds.slice(0, pairs), ...teamIds.slice(0, pairs)].map(
+    (id) => ({ id, k: Math.random() })
+  );
+  withKeys.sort((a, b) => a.k - b.k);
+  return withKeys.map((e) => e.id);
+}
+
+/**
+ * Picks a random set of teams to use as Match-the-Flag pairs and builds a
+ * shuffled deck for each level. Each level's deck is `2 * pairs` entries,
+ * with every team_id appearing exactly twice. The same team pool is reused
+ * across levels (each level just takes a prefix).
+ */
+export async function buildMatchTheFlagStart(): Promise<MatchTheFlagStart> {
+  const teams = await sql<MatchTheFlagTeam[]>`
+    SELECT team_id, team_name, logo
+    FROM   teams
+    ORDER BY random()
+    LIMIT  ${MATCH_THE_FLAG_MAX_PAIRS}
+  `;
+  if (teams.length < MATCH_THE_FLAG_MAX_PAIRS) {
+    throw new Error(
+      `Not enough teams for Match the Flag (need ${MATCH_THE_FLAG_MAX_PAIRS.toString()}, got ${teams.length.toString()})`
+    );
+  }
+  const teamIds = teams.map((t) => t.team_id);
+  const [pairs1, pairs2, pairs3] = MATCH_THE_FLAG_PAIRS_PER_LEVEL;
+  return {
+    selected_flags: {
+      level1: buildDeck(teamIds, pairs1),
+      level2: buildDeck(teamIds, pairs2),
+      level3: buildDeck(teamIds, pairs3),
+    },
+    teams,
+  };
+}
+
 /**
  * Picks a fresh set of trivia questions: 4 Easy, 3 Medium, 3 Hard, in that
  * order. Correct answers are never returned to the client.
@@ -169,6 +230,68 @@ async function computeTriviaScore(gamePlayId: string): Promise<number> {
 }
 
 /**
+ * Computes a Match-the-Flag game's final score: 2 points per validly matched
+ * pair across all 3 levels. A "valid" match is a flag_match action whose two
+ * indexes point at the same team_id within the level's deck stored in the
+ * selected_flags action. Duplicate (same-pair) match actions are deduped so
+ * they only score once.
+ */
+async function computeMatchTheFlagScore(gamePlayId: string): Promise<number> {
+  const rows = await sql<{ action_type: string; extra_data: unknown }[]>`
+    SELECT action_type, extra_data
+    FROM   game_actions
+    WHERE  game_play_id = ${gamePlayId}
+      AND  action_type IN ('selected_flags', 'flag_match')
+    ORDER BY game_action_id ASC
+  `;
+
+  let decks: Record<string, unknown[]> | null = null;
+  // Dedupe matches by "level:minIdx:maxIdx" so the same pair only ever scores
+  // once even if the client somehow sent it twice.
+  const counted = new Set<string>();
+  let pairs = 0;
+
+  for (const row of rows) {
+    if (row.action_type === 'selected_flags') {
+      if (decks !== null) continue; // use the first selected_flags row only
+      const data = row.extra_data;
+      if (data && typeof data === 'object') {
+        decks = data as Record<string, unknown[]>;
+      }
+      continue;
+    }
+    // flag_match
+    if (!decks) continue;
+    const data = row.extra_data;
+    if (!data || typeof data !== 'object') continue;
+    const { level, matching_indexes } = data as {
+      level?: unknown;
+      matching_indexes?: unknown;
+    };
+    if (typeof level !== 'number' || !Array.isArray(matching_indexes)) continue;
+    const indexes = matching_indexes as unknown[];
+    if (indexes.length < 2) continue;
+    const rawA = indexes[0];
+    const rawB = indexes[1];
+    if (typeof rawA !== 'number' || typeof rawB !== 'number') continue;
+    if (rawA === rawB) continue;
+    const idxA = Math.min(rawA, rawB);
+    const idxB = Math.max(rawA, rawB);
+    const deck = decks['level' + level.toString()];
+    if (!Array.isArray(deck)) continue;
+    if (idxA < 0 || idxB >= deck.length) continue;
+    const key = level.toString() + ':' + idxA.toString() + ':' + idxB.toString();
+    if (counted.has(key)) continue;
+    counted.add(key);
+    if (deck[idxA] === deck[idxB]) {
+      pairs += 1;
+    }
+  }
+
+  return pairs * MATCH_THE_FLAG_POINTS_PER_PAIR;
+}
+
+/**
  * Ends a game play session.
  * On success inserts a game_play_results row and updates user_numbers (total_score).
  */
@@ -189,6 +312,8 @@ export async function endGamePlay(gamePlayId: string, userId: string): Promise<E
   let score = 0;
   if (gameType === 101) {
     score = await computeTriviaScore(gamePlayId);
+  } else if (gameType === 103) {
+    score = await computeMatchTheFlagScore(gamePlayId);
   }
   // Other game types have no scoring rules yet.
 

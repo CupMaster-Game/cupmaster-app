@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 import { validator } from 'hono/validator';
 import { z } from 'zod';
 import {
+  buildMatchTheFlagStart,
   bufferIngameAction,
   createGamePlay,
   endGamePlay,
@@ -71,9 +72,41 @@ export const gameRoutes = new Hono<AuthEnv>()
     return c.json({ error: 'Not implemented yet' }, 501);
   })
 
-  // POST /game/match_the_flag/start — stub, implementation pending.
-  .post('/match_the_flag/start', (c) => {
-    return c.json({ error: 'Not implemented yet' }, 501);
+  // POST /game/match_the_flag/start — begin a Match-the-Flag round.
+  // Samples a random set of teams, builds a shuffled deck per level (each
+  // team_id appears twice in its level's deck), records the selection as a
+  // `selected_flags` game_action (atomic with the session), and returns the
+  // decks plus team metadata so the client can render flag images.
+  .post('/match_the_flag/start', async (c) => {
+    const { user_id } = c.var.user;
+
+    const tournamentId = await getActiveTournament();
+    const start = await buildMatchTheFlagStart();
+
+    const gamePlay = await withTransaction(async (tx) => {
+      const created = await createGamePlay(tx, user_id, 103, tournamentId, getClientIp(c));
+      if (!created) return null;
+      await insertGameAction(
+        tx,
+        created.game_play_id,
+        'selected_flags',
+        null,
+        null,
+        start.selected_flags
+      );
+      return created;
+    });
+
+    if (!gamePlay) {
+      return c.json({ error: 'Not enough energy' }, 400);
+    }
+
+    return c.json({
+      game_play_id: gamePlay.game_play_id,
+      started_at: dateFromId(gamePlay.game_play_id),
+      selected_flags: start.selected_flags,
+      teams: start.teams,
+    });
   })
 
   // POST /game/end — finish a game play session with a score
