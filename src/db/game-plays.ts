@@ -1,6 +1,8 @@
+import type postgres from 'postgres';
 import { type GameTypeId } from '../constants.ts';
-import { dateFromId } from '../utils/index.ts';
 import { sql, withTransaction } from './index.ts';
+
+type Sql = postgres.Sql | postgres.ReservedSql | postgres.TransactionSql;
 
 // ---------------------------------------------------------------------------
 // Row types
@@ -19,50 +21,113 @@ export interface GamePlayResultRow {
   score: number;
 }
 
+export interface TriviaQuestionPublic {
+  question_id: number;
+  category: string;
+  difficulty: 'Easy' | 'Medium' | 'Hard';
+  question: string;
+  option_a: string;
+  option_b: string;
+  option_c: string;
+  option_d: string;
+}
+
 // ---------------------------------------------------------------------------
 // Queries
 // ---------------------------------------------------------------------------
 
 /**
- * Starts a game play session. Transactionally:
- * 1. Checks that user has energy > 0
- * 2. Decrements energy by 1
- * 3. Inserts a new game_plays row
+ * Creates a game play row inside the provided transaction.
  *
- * Returns the new game play row, or null if energy is 0.
+ * 1. Decrements energy (succeeds only if user has energy > 0).
+ * 2. Inserts a new game_plays row.
+ *
+ * Returns the new game_play_id, or null if the user is out of energy. The
+ * caller controls transaction scope so additional rows (e.g. the initial
+ * trivia_questions game_action) can be inserted atomically with the session.
  */
-export async function startGamePlay(
+export async function createGamePlay(
+  tx: Sql,
   userId: string,
-  tournamentId: string,
   gameType: GameTypeId,
+  tournamentId: string,
   ipAddress: string | null
-): Promise<GamePlayRow | null> {
-  return withTransaction(async (tx) => {
-    // Decrement energy and increment games_played atomically;
-    // the WHERE energy > 0 prevents going below zero.
-    const updated = await tx<{ energy: number }[]>`
-      UPDATE user_numbers
-      SET    energy = energy - 1,
-             games_played = games_played + 1,
-             updated_at = now()
-      WHERE  user_id = ${userId}
-        AND  game_type = ${gameType}
-        AND  energy > 0
-      RETURNING energy
-    `;
+): Promise<{ game_play_id: string } | null> {
+  const updated = await tx<{ energy: number }[]>`
+    UPDATE user_numbers
+    SET    energy = energy - 1,
+           games_played = games_played + 1
+    WHERE  user_id = ${userId}
+      AND  game_type = ${gameType}
+      AND  energy > 0
+    RETURNING energy
+  `;
 
-    if (updated.length === 0) {
-      return null;
-    }
+  if (updated.length === 0) {
+    return null;
+  }
 
-    const inserted = await tx<GamePlayRow[]>`
-      INSERT INTO game_plays (user_id, game_type, tournament_id, ip_address)
-      VALUES (${userId}, ${gameType}, ${tournamentId}, ${ipAddress})
-      RETURNING game_play_id, user_id, game_type, tournament_id
-    `;
+  const inserted = await tx<{ game_play_id: string }[]>`
+    INSERT INTO game_plays (user_id, game_type, tournament_id, ip_address)
+    VALUES (${userId}, ${gameType}, ${tournamentId}, ${ipAddress})
+    RETURNING game_play_id
+  `;
 
-    return inserted[0] ?? null;
-  });
+  return inserted[0] ?? null;
+}
+
+/**
+ * Inserts a single game_actions row inside the provided transaction. For
+ * high-frequency in-game events use bufferIngameAction instead.
+ */
+export async function insertGameAction(
+  tx: Sql,
+  gamePlayId: string,
+  actionType: string,
+  intval: number | null,
+  textval: string | null,
+  extraData: unknown
+): Promise<void> {
+  const extraJson =
+    extraData === null || extraData === undefined ? null : JSON.stringify(extraData);
+  await tx`
+    INSERT INTO game_actions (game_play_id, action_time, action_type, intval, textval, extra_data)
+    VALUES (${gamePlayId}, now(), ${actionType}, ${intval}, ${textval}, ${extraJson}::jsonb)
+  `;
+}
+
+/**
+ * Picks a fresh set of trivia questions: 4 Easy, 3 Medium, 3 Hard, in that
+ * order. Correct answers are never returned to the client.
+ */
+export async function selectTriviaQuestions(): Promise<TriviaQuestionPublic[]> {
+  const [easy, medium, hard] = await Promise.all([
+    sql<TriviaQuestionPublic[]>`
+      SELECT question_id, category, difficulty, question,
+             option_a, option_b, option_c, option_d
+      FROM   football_trivia_questions
+      WHERE  difficulty = 'Easy'
+      ORDER BY random()
+      LIMIT  4
+    `,
+    sql<TriviaQuestionPublic[]>`
+      SELECT question_id, category, difficulty, question,
+             option_a, option_b, option_c, option_d
+      FROM   football_trivia_questions
+      WHERE  difficulty = 'Medium'
+      ORDER BY random()
+      LIMIT  3
+    `,
+    sql<TriviaQuestionPublic[]>`
+      SELECT question_id, category, difficulty, question,
+             option_a, option_b, option_c, option_d
+      FROM   football_trivia_questions
+      WHERE  difficulty = 'Hard'
+      ORDER BY random()
+      LIMIT  3
+    `,
+  ]);
+  return [...easy, ...medium, ...hard];
 }
 
 export type EndGamePlayError =
@@ -74,11 +139,40 @@ export type EndGamePlayOutcome =
   | { ok: false; error: EndGamePlayError };
 
 /**
+ * Computes a trivia game's final score: 10 points per correct answer to a
+ * question that was selected at start. Answers for non-selected questions
+ * and duplicate answers for the same question are ignored.
+ */
+async function computeTriviaScore(gamePlayId: string): Promise<number> {
+  const rows = await sql<{ correct: number }[]>`
+    WITH trivia_action AS (
+      SELECT extra_data
+      FROM   game_actions
+      WHERE  game_play_id = ${gamePlayId}
+        AND  action_type = 'trivia_questions'
+      ORDER BY game_action_id ASC
+      LIMIT  1
+    ),
+    selected_ids AS (
+      SELECT (jsonb_array_elements_text(extra_data->'question_ids'))::int AS question_id
+      FROM   trivia_action
+    )
+    SELECT COUNT(DISTINCT ga.intval)::int AS correct
+    FROM   game_actions ga
+    JOIN   selected_ids s            ON s.question_id = ga.intval
+    JOIN   football_trivia_questions q ON q.question_id = ga.intval
+    WHERE  ga.game_play_id = ${gamePlayId}
+      AND  ga.action_type = 'trivia_answer'
+      AND  ga.textval     = q.correct_answer
+  `;
+  return (rows[0]?.correct ?? 0) * 10;
+}
+
+/**
  * Ends a game play session.
  * On success inserts a game_play_results row and updates user_numbers (total_score).
  */
 export async function endGamePlay(gamePlayId: string, userId: string): Promise<EndGamePlayOutcome> {
-  const startedAt = dateFromId(gamePlayId);
   await flushIngameActions();
 
   const gameTypeRows = await sql<{ game_type: GameTypeId }[]>`
@@ -92,8 +186,11 @@ export async function endGamePlay(gamePlayId: string, userId: string): Promise<E
     return { ok: false, error: 'invalid_session' };
   }
 
-  // TODO: game_type-specific validation rules
-  const score = 1;
+  let score = 0;
+  if (gameType === 101) {
+    score = await computeTriviaScore(gamePlayId);
+  }
+  // Other game types have no scoring rules yet.
 
   const result = await withTransaction(async (tx) => {
     // Atomic insert: succeeds only if the game_play exists with the right
@@ -117,9 +214,7 @@ export async function endGamePlay(gamePlayId: string, userId: string): Promise<E
 
     await tx`
       UPDATE user_numbers
-      SET
-             total_score       = total_score + ${score},
-             updated_at        = now()
+      SET    total_score = total_score + ${score}
       FROM   game_plays gp
       WHERE  user_numbers.user_id = ${userId}
         AND  gp.game_play_id = ${gamePlayId}
@@ -182,7 +277,7 @@ async function doFlushIngameActions(): Promise<void> {
 
   try {
     await sql`
-      INSERT INTO game_actions (game_play_id, action_time, actiion_type, intval, textval, extra_data)
+      INSERT INTO game_actions (game_play_id, action_time, action_type, intval, textval, extra_data)
       SELECT t.game_play_id::bigint,
              t.action_time::timestamptz,
              t.action_type,

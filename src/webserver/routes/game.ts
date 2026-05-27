@@ -4,10 +4,13 @@ import { validator } from 'hono/validator';
 import { z } from 'zod';
 import {
   bufferIngameAction,
+  createGamePlay,
   endGamePlay,
   getActiveTournament,
-  startGamePlay,
+  insertGameAction,
+  selectTriviaQuestions,
 } from '../../db/game-plays.ts';
+import { withTransaction } from '../../db/index.ts';
 import { dateFromId } from '../../utils/index.ts';
 import { authMiddleware, type AuthEnv } from '../middleware/auth.ts';
 
@@ -29,39 +32,49 @@ function getClientIp(c: Context): string | null {
 export const gameRoutes = new Hono<AuthEnv>()
   .use(authMiddleware)
 
-  // POST /game/start — begin a new game play session
-  .post(
-    '/start',
-    validator('json', (value, c) => {
-      const result = z
-        .object({
-          game_type: z.union([z.literal(101), z.literal(102), z.literal(103)]),
-        })
-        .safeParse(value);
-      if (!result.success) {
-        return c.json({ error: 'Invalid request body', details: result.error.issues }, 400);
-      }
-      return result.data;
-    }),
-    async (c) => {
-      const { user_id } = c.var.user;
-      const { game_type } = c.req.valid('json');
+  // POST /game/football_trivia/start — begin a Football Trivia round.
+  // Picks 4 Easy + 3 Medium + 3 Hard questions, records the selection as a
+  // `trivia_questions` game_action (atomic with the session), and returns
+  // the questions without their answers.
+  .post('/football_trivia/start', async (c) => {
+    const { user_id } = c.var.user;
 
-      console.log(`[game/start] user=${user_id} ua=${c.req.header('user-agent') ?? '(none)'}`);
-
-      const tournamentId = await getActiveTournament();
-      const gamePlay = await startGamePlay(user_id, tournamentId, game_type, getClientIp(c));
-
-      if (!gamePlay) {
-        return c.json({ error: 'Not enough energy' }, 400);
-      }
-
-      return c.json({
-        game_play_id: gamePlay.game_play_id,
-        started_at: dateFromId(gamePlay.game_play_id),
-      });
+    const tournamentId = await getActiveTournament();
+    const questions = await selectTriviaQuestions();
+    if (questions.length < 10) {
+      return c.json({ error: 'Not enough trivia questions available' }, 500);
     }
-  )
+    const questionIds = questions.map((q) => q.question_id);
+
+    const gamePlay = await withTransaction(async (tx) => {
+      const created = await createGamePlay(tx, user_id, 101, tournamentId, getClientIp(c));
+      if (!created) return null;
+      await insertGameAction(tx, created.game_play_id, 'trivia_questions', null, null, {
+        question_ids: questionIds,
+      });
+      return created;
+    });
+
+    if (!gamePlay) {
+      return c.json({ error: 'Not enough energy' }, 400);
+    }
+
+    return c.json({
+      game_play_id: gamePlay.game_play_id,
+      started_at: dateFromId(gamePlay.game_play_id),
+      questions,
+    });
+  })
+
+  // POST /game/guess_the_player/start — stub, implementation pending.
+  .post('/guess_the_player/start', (c) => {
+    return c.json({ error: 'Not implemented yet' }, 501);
+  })
+
+  // POST /game/match_the_flag/start — stub, implementation pending.
+  .post('/match_the_flag/start', (c) => {
+    return c.json({ error: 'Not implemented yet' }, 501);
+  })
 
   // POST /game/end — finish a game play session with a score
   .post(
