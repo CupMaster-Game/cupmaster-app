@@ -99,8 +99,12 @@ export type GameKind = 'trivia' | 'guess_player' | 'match_flag';
 
 export interface GameSummary {
   kind: GameKind;
+  /** Game type id used by the backend / Game contract (101, 102, 103). */
+  gameType: 101 | 102 | 103;
   title: string;
   description: string;
+  /** Display price for one energy, e.g. "0.01$". */
+  priceLabel: string;
   playedCount: number;
   accent: 'purple' | 'green' | 'orange';
 }

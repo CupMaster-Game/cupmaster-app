@@ -1,4 +1,4 @@
-import { SIGNUP_ENERGIES } from '../constants.ts';
+import { GAME_TYPE_IDS, SIGNUP_ENERGIES, type GameTypeId } from '../constants.ts';
 import { dateFromId } from '../utils/index.ts';
 import { makeSmartCached } from '../utils/smart-cache.ts';
 import { sql, withTransaction } from './index.ts';
@@ -88,6 +88,26 @@ export async function findUserByName(name: string): Promise<UserRow | null> {
     WHERE  name = ${name}
   `;
   return rows[0] ?? null;
+}
+
+export type UserEnergies = Record<GameTypeId, number>;
+
+/**
+ * Returns the user's current energy balance per game type. Missing rows
+ * fall back to 0 so the response always contains all known game types.
+ */
+export async function getUserEnergies(userId: string): Promise<UserEnergies> {
+  const rows = await sql<{ game_type: number; energy: number }[]>`
+    SELECT game_type, energy
+    FROM   user_numbers
+    WHERE  user_id = ${userId}
+  `;
+  const byType = new Map(rows.map((r) => [r.game_type, r.energy]));
+  const out = {} as UserEnergies;
+  for (const gameType of GAME_TYPE_IDS) {
+    out[gameType] = byType.get(gameType) ?? 0;
+  }
+  return out;
 }
 
 export async function getUserWithNumbers(userId: string): Promise<UserWithNumbersRow | null> {

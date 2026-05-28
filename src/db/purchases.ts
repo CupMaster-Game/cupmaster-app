@@ -46,8 +46,7 @@ export async function processPurchase(
       `;
       await tx`
         UPDATE user_numbers
-        SET    energy = energy + 1,
-               updated_at = now()
+        SET    energy = energy + 1
         WHERE  user_id = ${userId} AND game_type = ${itemTypeId}
       `;
     }

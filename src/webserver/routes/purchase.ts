@@ -3,12 +3,12 @@ import { validator } from 'hono/validator';
 import { formatUnits, parseEventLogs } from 'viem';
 import { z } from 'zod';
 import cupmasterGameAbi from '../../abis/cupmaster-game.abi.ts';
-import { CUPMASTER_GAME_ADDRESS, PAYMENT_TOKENS } from '../../constants.ts';
+import { CUPMASTER_GAME_ADDRESS, GAME_TYPE_IDS, PAYMENT_TOKENS } from '../../constants.ts';
 import { findTransactionByHash, processPurchase } from '../../db/purchases.ts';
 import { getBlock, getTransactionReceipt } from '../../utils/celo-rpc-reader.ts';
 import { authMiddleware, type AuthEnv } from '../middleware/auth.ts';
 
-const VALID_ITEM_TYPES = new Set([1, 2, 3, 4, 5]);
+const VALID_ITEM_TYPES = new Set<number>(GAME_TYPE_IDS);
 
 export const purchaseRoutes = new Hono<AuthEnv>()
   .use(authMiddleware)

@@ -5,6 +5,7 @@ import { getCachedLeaderboards } from '../../db/leaderboard.ts';
 import { getPendingPayouts } from '../../db/payouts.ts';
 import {
   findUserIdByAddress,
+  getUserEnergies,
   getUserInventory,
   getUserWithNumbers,
   renameUser,
@@ -62,6 +63,11 @@ export const userRoutes = new Hono<AuthEnv>()
     }
 
     return c.json(response);
+  })
+  .get('/numbers', async (c) => {
+    const { user_id } = c.var.user;
+    const energies = await getUserEnergies(user_id);
+    return c.json({ energies });
   })
   .post(
     '/rename',
