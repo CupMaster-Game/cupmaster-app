@@ -11,6 +11,7 @@ import { ProfilePage } from '@/pages/ProfilePage';
 import { LandingPage } from '@/pages/LandingPage';
 import { PrivacyPolicyPage } from '@/pages/PrivacyPolicyPage';
 import { TermsOfServicePage } from '@/pages/TermsOfServicePage';
+import { HelpPage } from '@/pages/HelpPage';
 import { useAuth } from '@/hooks/useAuth';
 
 export default function App() {
@@ -30,6 +31,7 @@ export default function App() {
     <Routes>
       <Route path="/privacy" element={<PrivacyPolicyPage />} />
       <Route path="/terms" element={<TermsOfServicePage />} />
+      <Route path="/help" element={<HelpPage />} />
       {!isSignedIn && (
         <Route path="*" element={<LandingPage address={address} />} />
       )}

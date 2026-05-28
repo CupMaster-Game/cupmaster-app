@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { HelpCircle } from 'lucide-react';
 import { Logo } from '@/components/ui/Logo';
 import { Avatar } from '@/components/ui/Avatar';
 import { useAuth } from '@/hooks/useAuth';
@@ -20,6 +21,13 @@ export function TopBar() {
               {user.stats.total_score.toLocaleString()}
             </span>
           </div>
+          <Link
+            to="/help"
+            aria-label="Help"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full text-text-secondary hover:bg-bg-elevated hover:text-text-primary"
+          >
+            <HelpCircle className="h-5 w-5" />
+          </Link>
           <Link
             to="/profile"
             className="relative inline-block"
