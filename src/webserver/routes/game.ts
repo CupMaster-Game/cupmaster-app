@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 import { validator } from 'hono/validator';
 import { z } from 'zod';
 import {
+  buildGuessThePlayerStart,
   buildMatchTheFlagStart,
   bufferIngameAction,
   createGamePlay,
@@ -67,9 +68,39 @@ export const gameRoutes = new Hono<AuthEnv>()
     });
   })
 
-  // POST /game/guess_the_player/start — stub, implementation pending.
-  .post('/guess_the_player/start', (c) => {
-    return c.json({ error: 'Not implemented yet' }, 501);
+  // POST /game/guess_the_player/start — begin a Guess The Player round.
+  // Picks 2 random players from guess_the_player_data, records the selection
+  // as a `selected_players` game_action (atomic with the session), and
+  // returns the players with their hints (no answer column).
+  .post('/guess_the_player/start', async (c) => {
+    const { user_id } = c.var.user;
+
+    const tournamentId = await getActiveTournament();
+    const start = await buildGuessThePlayerStart();
+
+    const gamePlay = await withTransaction(async (tx) => {
+      const created = await createGamePlay(tx, user_id, 102, tournamentId, getClientIp(c));
+      if (!created) return null;
+      await insertGameAction(
+        tx,
+        created.game_play_id,
+        'selected_players',
+        null,
+        null,
+        start.selected_players
+      );
+      return created;
+    });
+
+    if (!gamePlay) {
+      return c.json({ error: 'Not enough energy' }, 400);
+    }
+
+    return c.json({
+      game_play_id: gamePlay.game_play_id,
+      started_at: dateFromId(gamePlay.game_play_id),
+      players: start.players,
+    });
   })
 
   // POST /game/match_the_flag/start — begin a Match-the-Flag round.

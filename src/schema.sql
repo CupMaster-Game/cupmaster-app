@@ -193,6 +193,17 @@ CREATE TABLE football_trivia_questions (
     correct_answer CHAR(1)     NOT NULL CHECK (correct_answer IN ('A', 'B', 'C', 'D'))
 );
 
+-- Guess The Player game data (no-update, static data)
+CREATE TABLE guess_the_player_data (
+    player_id      INTEGER     PRIMARY KEY,
+    player         TEXT        NOT NULL,
+    hint_1         TEXT        NOT NULL,
+    hint_2         TEXT        NOT NULL,
+    hint_3         TEXT        NOT NULL,
+    hint_4         TEXT        NOT NULL,
+    hint_5         TEXT        NOT NULL
+);
+
 -- User stats per gametype (updateable) (recreateable summary) (high-churn row → HOT-update friendly)
 CREATE TABLE user_numbers (
     user_id           BIGINT  REFERENCES users(user_id),

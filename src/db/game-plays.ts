@@ -102,6 +102,48 @@ export async function insertGameAction(
   `;
 }
 
+export interface GuessThePlayerPublic {
+  player_id: number;
+  player: string;
+  hint_1: string;
+  hint_2: string;
+  hint_3: string;
+  hint_4: string;
+  hint_5: string;
+}
+
+export interface GuessThePlayerStart {
+  selected_players: { player_ids: number[] };
+  players: GuessThePlayerPublic[];
+}
+
+const GUESS_THE_PLAYER_ROUNDS = 2;
+const GUESS_THE_PLAYER_POINTS_BY_HINTS = [50, 40, 30, 20, 10] as const;
+
+/**
+ * Picks a random pair of players and returns their hints and answers.
+ * The client validates the user's typed guess locally and only POSTs a
+ * `guess_player` action on a correct match (per task spec), so the answer
+ * has to be present in the payload.
+ */
+export async function buildGuessThePlayerStart(): Promise<GuessThePlayerStart> {
+  const players = await sql<GuessThePlayerPublic[]>`
+    SELECT player_id, player, hint_1, hint_2, hint_3, hint_4, hint_5
+    FROM   guess_the_player_data
+    ORDER BY random()
+    LIMIT  ${GUESS_THE_PLAYER_ROUNDS}
+  `;
+  if (players.length < GUESS_THE_PLAYER_ROUNDS) {
+    throw new Error(
+      `Not enough Guess The Player rows (need ${GUESS_THE_PLAYER_ROUNDS.toString()}, got ${players.length.toString()})`
+    );
+  }
+  return {
+    selected_players: { player_ids: players.map((p) => p.player_id) },
+    players,
+  };
+}
+
 export interface MatchTheFlagTeam {
   team_id: string;
   team_name: string;
@@ -292,6 +334,55 @@ async function computeMatchTheFlagScore(gamePlayId: string): Promise<number> {
 }
 
 /**
+ * Computes a Guess The Player game's final score. For every selected player,
+ * if there is a guess_player action with matching player_id, awards points
+ * based on used_hint_count: 1 → 50, 2 → 40, 3 → 30, 4 → 20, 5 → 10. The
+ * earliest valid guess per player_id wins; later guesses are ignored.
+ */
+async function computeGuessThePlayerScore(gamePlayId: string): Promise<number> {
+  const rows = await sql<{ action_type: string; extra_data: unknown }[]>`
+    SELECT action_type, extra_data
+    FROM   game_actions
+    WHERE  game_play_id = ${gamePlayId}
+      AND  action_type IN ('selected_players', 'guess_player')
+    ORDER BY game_action_id ASC
+  `;
+
+  let selected: Set<number> | null = null;
+  const scored = new Set<number>();
+  let score = 0;
+
+  for (const row of rows) {
+    if (row.action_type === 'selected_players') {
+      if (selected !== null) continue;
+      const data = row.extra_data;
+      if (!data || typeof data !== 'object') continue;
+      const ids = (data as { player_ids?: unknown }).player_ids;
+      if (!Array.isArray(ids)) continue;
+      selected = new Set(ids.filter((v): v is number => typeof v === 'number'));
+      continue;
+    }
+    if (!selected) continue;
+    const data = row.extra_data;
+    if (!data || typeof data !== 'object') continue;
+    const { player_id, used_hint_count } = data as {
+      player_id?: unknown;
+      used_hint_count?: unknown;
+    };
+    if (typeof player_id !== 'number' || typeof used_hint_count !== 'number') continue;
+    if (!selected.has(player_id)) continue;
+    if (scored.has(player_id)) continue;
+    const idx = used_hint_count - 1;
+    const pts = GUESS_THE_PLAYER_POINTS_BY_HINTS[idx];
+    if (pts === undefined) continue;
+    scored.add(player_id);
+    score += pts;
+  }
+
+  return score;
+}
+
+/**
  * Ends a game play session.
  * On success inserts a game_play_results row and updates user_numbers (total_score).
  */
@@ -312,6 +403,8 @@ export async function endGamePlay(gamePlayId: string, userId: string): Promise<E
   let score = 0;
   if (gameType === 101) {
     score = await computeTriviaScore(gamePlayId);
+  } else if (gameType === 102) {
+    score = await computeGuessThePlayerScore(gamePlayId);
   } else if (gameType === 103) {
     score = await computeMatchTheFlagScore(gamePlayId);
   }
