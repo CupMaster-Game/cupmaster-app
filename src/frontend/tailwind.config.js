@@ -41,6 +41,7 @@ export default {
           purple: '#a855f7',
           orange: '#f97316',
           red: '#ef4444',
+          green: '#22c55e',
           yellow: '#facc15',
           gold: '#fbbf24',
           silver: '#cbd5e1',

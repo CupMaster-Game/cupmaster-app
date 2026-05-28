@@ -4,7 +4,7 @@ import { sql, withTransaction } from './index.ts';
 
 // Match-the-Flag deck sizes. Each level uses N unique team flags, with every
 // flag appearing twice in the shuffled deck, so the deck has 2*N entries.
-export const MATCH_THE_FLAG_PAIRS_PER_LEVEL = [8, 15, 24] as const;
+export const MATCH_THE_FLAG_PAIRS_PER_LEVEL = [6, 8, 12] as const;
 const MATCH_THE_FLAG_MAX_PAIRS = Math.max(...MATCH_THE_FLAG_PAIRS_PER_LEVEL);
 const MATCH_THE_FLAG_POINTS_PER_PAIR = 2;
 
@@ -36,6 +36,9 @@ export interface TriviaQuestionPublic {
   option_b: string;
   option_c: string;
   option_d: string;
+  // Returned to the client so it can give instant red/green feedback on pick.
+  // Not secure — a determined client can read this — but acceptable for now.
+  correct_answer: 'A' | 'B' | 'C' | 'D';
 }
 
 // ---------------------------------------------------------------------------
@@ -162,9 +165,10 @@ export interface MatchTheFlagStart {
 }
 
 function buildDeck(teamIds: readonly string[], pairs: number): string[] {
-  const withKeys = [...teamIds.slice(0, pairs), ...teamIds.slice(0, pairs)].map(
-    (id) => ({ id, k: Math.random() })
-  );
+  const withKeys = [...teamIds.slice(0, pairs), ...teamIds.slice(0, pairs)].map((id) => ({
+    id,
+    k: Math.random(),
+  }));
   withKeys.sort((a, b) => a.k - b.k);
   return withKeys.map((e) => e.id);
 }
@@ -207,7 +211,7 @@ export async function selectTriviaQuestions(): Promise<TriviaQuestionPublic[]> {
   const [easy, medium, hard] = await Promise.all([
     sql<TriviaQuestionPublic[]>`
       SELECT question_id, category, difficulty, question,
-             option_a, option_b, option_c, option_d
+             option_a, option_b, option_c, option_d, correct_answer
       FROM   football_trivia_questions
       WHERE  difficulty = 'Easy'
       ORDER BY random()
@@ -215,7 +219,7 @@ export async function selectTriviaQuestions(): Promise<TriviaQuestionPublic[]> {
     `,
     sql<TriviaQuestionPublic[]>`
       SELECT question_id, category, difficulty, question,
-             option_a, option_b, option_c, option_d
+             option_a, option_b, option_c, option_d, correct_answer
       FROM   football_trivia_questions
       WHERE  difficulty = 'Medium'
       ORDER BY random()
@@ -223,7 +227,7 @@ export async function selectTriviaQuestions(): Promise<TriviaQuestionPublic[]> {
     `,
     sql<TriviaQuestionPublic[]>`
       SELECT question_id, category, difficulty, question,
-             option_a, option_b, option_c, option_d
+             option_a, option_b, option_c, option_d, correct_answer
       FROM   football_trivia_questions
       WHERE  difficulty = 'Hard'
       ORDER BY random()

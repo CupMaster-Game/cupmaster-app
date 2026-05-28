@@ -11,6 +11,8 @@ interface TriviaGameProps {
   onClose: () => void;
 }
 
+type AnswerLetter = 'A' | 'B' | 'C' | 'D';
+
 interface TriviaQuestion {
   question_id: number;
   category: string;
@@ -20,9 +22,8 @@ interface TriviaQuestion {
   option_b: string;
   option_c: string;
   option_d: string;
+  correct_answer: AnswerLetter;
 }
-
-type AnswerLetter = 'A' | 'B' | 'C' | 'D';
 
 type Phase = 'loading' | 'playing' | 'ending' | 'done' | 'error';
 
@@ -282,7 +283,10 @@ export function TriviaGame({ open, onClose }: TriviaGameProps) {
         <div className="space-y-2">
           {options.map((opt) => {
             const isPicked = picked === opt.letter;
+            const isCorrect = opt.letter === q.correct_answer;
             const locked = picked !== null;
+            const showCorrect = locked && isCorrect;
+            const showWrongPick = locked && isPicked && !isCorrect;
             return (
               <button
                 key={opt.letter}
@@ -294,8 +298,9 @@ export function TriviaGame({ open, onClose }: TriviaGameProps) {
                 className={cn(
                   'flex w-full items-center justify-between rounded-xl border px-4 py-3 text-left text-sm font-medium transition-all',
                   !locked && 'border-border-default bg-bg-elevated hover:border-border-strong',
-                  locked && isPicked && 'border-brand-500 bg-brand-500/15 text-brand-300',
-                  locked && !isPicked && 'opacity-50'
+                  showCorrect && 'border-accent-green bg-accent-green/15 text-accent-green',
+                  showWrongPick && 'border-accent-red bg-accent-red/15 text-accent-red',
+                  locked && !isPicked && !isCorrect && 'opacity-50'
                 )}
               >
                 <span>
