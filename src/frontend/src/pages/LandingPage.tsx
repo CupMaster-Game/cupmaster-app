@@ -1,11 +1,11 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Wallet, LogIn, UserPlus } from 'lucide-react';
-import { Logo } from '@/components/ui/Logo';
-import { Button } from '@/components/ui/Button';
 import { SignUpModal } from '@/components/auth/SignUpModal';
+import { Button } from '@/components/ui/Button';
+import { Logo } from '@/components/ui/Logo';
 import { useAuth } from '@/hooks/useAuth';
 import { modal as walletModal } from '@/lib/wagmi';
+import { LogIn, UserPlus, Wallet } from 'lucide-react';
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
 
 function shortenAddress(addr: string | undefined): string {
   if (!addr) return '';
@@ -38,30 +38,19 @@ export function LandingPage({ address }: LandingPageProps) {
         {address && (
           <div className="chip absolute left-4 top-4 text-xs">
             <span className="h-2 w-2 rounded-full bg-brand-500" />
-            <span className="font-mono text-text-secondary">
-              {shortenAddress(address)}
-            </span>
+            <span className="font-mono text-text-secondary">{shortenAddress(address)}</span>
           </div>
         )}
 
-        <div className="flex flex-col items-center gap-3">
-          <Logo showWordmark={false} className="scale-150" />
-          <div className="mt-2 text-3xl font-extrabold tracking-tight">
-            <span className="text-text-primary">Cup</span>
-            <span className="bg-brand-gradient bg-clip-text text-transparent">
-              Master
-            </span>
-          </div>
+        <div className="flex flex-col items-center gap-4">
+          <Logo variant="full" className="w-72" />
           <p className="max-w-xs text-balance text-center text-sm text-text-muted">
-            Predict the FIFA World Cup 2026. Climb the leaderboard. Win
-            rewards.
+            Play football games and earn rewards
           </p>
         </div>
 
         <div className="mt-10 flex w-full flex-col items-center gap-3">
-          {isLoading && (
-            <div className="text-sm text-text-muted">Checking session…</div>
-          )}
+          {isLoading && <div className="text-sm text-text-muted">Checking session…</div>}
 
           {!isLoading && !isConnected && (
             <Button

@@ -1,6 +1,6 @@
-import { createAppKit } from '@reown/appkit/react';
 import { WagmiAdapter } from '@reown/appkit-adapter-wagmi';
 import { celo } from '@reown/appkit/networks';
+import { createAppKit } from '@reown/appkit/react';
 
 // TODO: replace with the CupMaster Reown project id before going to production.
 const projectId =
@@ -9,11 +9,8 @@ const projectId =
 
 const metadata = {
   name: 'CupMaster',
-  description: 'Predict the FIFA World Cup 2026 and earn rewards.',
-  url:
-    typeof window !== 'undefined'
-      ? window.location.origin
-      : 'https://cupmaster.app',
+  description: 'Play football games and earn rewards',
+  url: typeof window !== 'undefined' ? window.location.origin : 'https://cupmaster.app',
   icons: ['/favicon.svg'],
 };
 
