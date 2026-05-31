@@ -39,21 +39,16 @@ export function LeaderboardPage() {
     return () => { window.clearInterval(t); };
   }, []);
 
+  const authed = useMemo(() => getAuthedApi(address), [address]);
+
   useEffect(() => {
+    if (!authed) return;
     let cancelled = false;
-    const authed = getAuthedApi(address);
-    if (!authed) {
-      setLoading(false);
-      setError('Please sign in to view the leaderboard.');
-      return;
-    }
-    setLoading(true);
-    setError(null);
     authed.leaderboard
       .$get()
       .then(async (res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status.toString()}`);
-        return (await res.json()) as LeaderboardResponse;
+        return await res.json();
       })
       .then((payload) => {
         if (cancelled) return;
@@ -70,7 +65,7 @@ export function LeaderboardPage() {
     return () => {
       cancelled = true;
     };
-  }, [address]);
+  }, [authed]);
 
   const scopeData = scope === 'tournament' ? data?.active : data?.overall;
   const entries = useMemo<LeaderboardEntry[]>(() => {
@@ -92,6 +87,12 @@ export function LeaderboardPage() {
 
   const m = Math.floor(secondsLeft / 60);
   const s = secondsLeft % 60;
+
+  const noAuthError = !authed
+    ? 'Please sign in to view the leaderboard.'
+    : null;
+  const displayLoading = !noAuthError && loading;
+  const displayError = noAuthError ?? error;
 
   return (
     <div className="space-y-4 pb-4">
@@ -117,22 +118,22 @@ export function LeaderboardPage() {
         ]}
       />
 
-      {loading && (
+      {displayLoading && (
         <Card className="px-4 py-6 text-center text-sm text-text-muted">
           Loading leaderboard…
         </Card>
       )}
-      {!loading && error && (
+      {!displayLoading && displayError && (
         <Card className="px-4 py-6 text-center text-sm text-accent-red">
-          {error}
+          {displayError}
         </Card>
       )}
-      {!loading && !error && entries.length === 0 && (
+      {!displayLoading && !displayError && entries.length === 0 && (
         <Card className="px-4 py-6 text-center text-sm text-text-muted">
           No players on the leaderboard yet.
         </Card>
       )}
-      {!loading && !error && entries.length > 0 && (
+      {!displayLoading && !displayError && entries.length > 0 && (
         <>
           <TopThree entries={top10} />
           <LeaderboardList entries={top10.slice(3)} />

@@ -34,8 +34,6 @@ export function FixturePage() {
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setError(null);
     api.fixtures
       .$get()
       .then(async (res) => {

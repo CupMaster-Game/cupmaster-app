@@ -1,14 +1,14 @@
-import { useCallback, useEffect, useState } from 'react';
-import { useAccount } from 'wagmi';
-import { PageHeader } from '@/components/ui/PageHeader';
 import { GameCard } from '@/components/games/GameCard';
-import { TriviaGame } from '@/components/games/TriviaGame';
 import { GuessThePlayerGame } from '@/components/games/GuessThePlayerGame';
 import { MatchTheFlagGame } from '@/components/games/MatchTheFlagGame';
+import { TriviaGame } from '@/components/games/TriviaGame';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { GAMES } from '@/data/games';
 import { usePlayGame } from '@/hooks/usePlayGame';
 import { getAuthedApi } from '@/lib/api';
 import type { GameKind, GameSummary } from '@/types';
+import { useCallback, useEffect, useState } from 'react';
+import { useAccount } from 'wagmi';
 
 type GameType = GameSummary['gameType'];
 type EnergyMap = Partial<Record<GameType, number>>;

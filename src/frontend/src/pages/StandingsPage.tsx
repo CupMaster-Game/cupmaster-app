@@ -39,8 +39,6 @@ export function StandingsPage() {
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setError(null);
     api.teams
       .$get()
       .then(async (res) => {

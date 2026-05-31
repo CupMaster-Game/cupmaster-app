@@ -11,7 +11,7 @@ export async function banSuspiciousUsers(tournamentId: string, tx?: Sql): Promis
   return withTransaction((t) => runBan(t, tournamentId));
 }
 
-async function runBan(tx: Sql, tournamentId: string): Promise<string[]> {
+async function runBan(_tx: Sql, _tournamentId: string): Promise<string[]> {
   //TODO: To be implemented later
   return [];
 }
