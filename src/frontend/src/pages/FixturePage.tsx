@@ -12,7 +12,7 @@ import {
   isSameDay,
   startOfDay,
 } from '@/lib/date';
-import { useAppStore } from '@/store/AppStore';
+import { useAppStore } from '@/store/useAppStore';
 import { cn } from '@/lib/cn';
 import type { ApiFixture, MatchOutcome } from '@/types';
 

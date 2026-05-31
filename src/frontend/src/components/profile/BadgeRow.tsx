@@ -1,6 +1,7 @@
 import { Check, Lock, Target, CheckCircle2, Calendar, TrendingUp, Gamepad2 } from 'lucide-react';
 import type { BadgeProgress, BadgeTier } from '@/types';
-import { useAppStore, badgeKey } from '@/store/AppStore';
+import { useAppStore } from '@/store/useAppStore';
+import { badgeKey } from '@/store/badgeKey';
 import { cn } from '@/lib/cn';
 
 interface BadgeRowProps {

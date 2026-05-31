@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight, Check } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import type { GroupId } from '@/types';
-import { useAppStore } from '@/store/AppStore';
+import { useAppStore } from '@/store/useAppStore';
 import { cn } from '@/lib/cn';
 import type { GroupTableTeam } from '@/components/standings/GroupTable';
 

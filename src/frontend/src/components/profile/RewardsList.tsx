@@ -2,7 +2,7 @@ import { Gift } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { REWARDS } from '@/data/user';
-import { useAppStore } from '@/store/AppStore';
+import { useAppStore } from '@/store/useAppStore';
 
 export function RewardsList() {
   const { claimedRewards, claimReward } = useAppStore();

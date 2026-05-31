@@ -3,7 +3,7 @@ import { Flag } from '@/components/ui/Flag';
 import { KNOCKOUT_BRACKET, type KnockoutMatch } from '@/data/standings';
 import { getTeam } from '@/data/teams';
 import { cn } from '@/lib/cn';
-import { useAppStore } from '@/store/AppStore';
+import { useAppStore } from '@/store/useAppStore';
 
 const ROUND_LABEL: Record<KnockoutMatch['round'], string> = {
   r32: 'Round of 32',

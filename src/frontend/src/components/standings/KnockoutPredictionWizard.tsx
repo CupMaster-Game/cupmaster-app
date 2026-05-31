@@ -4,7 +4,7 @@ import { Modal } from '@/components/ui/Modal';
 import { KNOCKOUT_BRACKET, type KnockoutMatch } from '@/data/standings';
 import { getTeam } from '@/data/teams';
 import { cn } from '@/lib/cn';
-import { useAppStore } from '@/store/AppStore';
+import { useAppStore } from '@/store/useAppStore';
 import { Check, ChevronRight, Trophy } from 'lucide-react';
 import { useMemo, useState } from 'react';
 

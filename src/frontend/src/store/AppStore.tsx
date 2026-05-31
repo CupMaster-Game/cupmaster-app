@@ -1,39 +1,12 @@
 import {
-  createContext,
   useCallback,
-  useContext,
   useEffect,
   useMemo,
   useState,
   type ReactNode,
 } from 'react';
-import type {
-  BadgeCategory,
-  BadgeTier,
-  GroupId,
-  KnockoutPrediction,
-  MatchOutcome,
-  MatchPrediction,
-} from '@/types';
-
-interface PersistedState {
-  predictions: Record<string, MatchPrediction>;
-  groupPredictions: Partial<Record<GroupId, [string, string, string, string]>>;
-  knockoutPredictions: Record<string, KnockoutPrediction>;
-  claimedBadges: Record<string, true>;
-  claimedRewards: Record<string, true>;
-}
-
-interface AppStore extends PersistedState {
-  setMatchPrediction: (matchId: string, pick: MatchOutcome) => void;
-  setGroupOrder: (
-    group: GroupId,
-    order: [string, string, string, string],
-  ) => void;
-  setKnockoutWinner: (matchId: string, winnerTeamId: string) => void;
-  claimBadge: (category: BadgeCategory, tier: BadgeTier) => void;
-  claimReward: (rewardId: string) => void;
-}
+import { AppStoreContext, type AppStore, type PersistedState } from './useAppStore';
+import { badgeKey } from './badgeKey';
 
 const STORAGE_KEY = 'cupmaster:v1';
 
@@ -64,12 +37,6 @@ function defaultState(): PersistedState {
     claimedRewards: {},
   };
 }
-
-export function badgeKey(category: BadgeCategory, tier: BadgeTier): string {
-  return `${category}:${tier}`;
-}
-
-const Ctx = createContext<AppStore | null>(null);
 
 export function AppStoreProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<PersistedState>(loadInitial);
@@ -155,11 +122,5 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     ],
   );
 
-  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
-}
-
-export function useAppStore(): AppStore {
-  const ctx = useContext(Ctx);
-  if (!ctx) throw new Error('useAppStore must be used inside AppStoreProvider');
-  return ctx;
+  return <AppStoreContext.Provider value={value}>{children}</AppStoreContext.Provider>;
 }
