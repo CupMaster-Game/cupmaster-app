@@ -1,16 +1,12 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useAccount } from 'wagmi';
-import { Clock, Trophy, Globe2 } from 'lucide-react';
-import { PageHeader } from '@/components/ui/PageHeader';
-import { Tabs } from '@/components/ui/Tabs';
-import { Card } from '@/components/ui/Card';
+import { LeaderboardList, YouRow } from '@/components/leaderboard/LeaderboardList';
 import { TopThree } from '@/components/leaderboard/TopThree';
-import {
-  LeaderboardList,
-  YouRow,
-} from '@/components/leaderboard/LeaderboardList';
+import { Card } from '@/components/ui/Card';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { getAuthedApi } from '@/lib/api';
 import type { LeaderboardEntry, LeaderboardScope } from '@/types';
+import { Clock } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { useAccount } from 'wagmi';
 
 const REFRESH_SECONDS = 5 * 60 + 34;
 
@@ -36,7 +32,9 @@ export function LeaderboardPage() {
     const t = window.setInterval(() => {
       setSecondsLeft((s) => (s > 0 ? s - 1 : REFRESH_SECONDS));
     }, 1000);
-    return () => { window.clearInterval(t); };
+    return () => {
+      window.clearInterval(t);
+    };
   }, []);
 
   const authed = useMemo(() => getAuthedApi(address), [address]);
@@ -88,20 +86,15 @@ export function LeaderboardPage() {
   const m = Math.floor(secondsLeft / 60);
   const s = secondsLeft % 60;
 
-  const noAuthError = !authed
-    ? 'Please sign in to view the leaderboard.'
-    : null;
+  const noAuthError = !authed ? 'Please sign in to view the leaderboard.' : null;
   const displayLoading = !noAuthError && loading;
   const displayError = noAuthError ?? error;
 
   return (
     <div className="space-y-4 pb-4">
-      <PageHeader
-        title="Leaderboard"
-        subtitle="Compete with players around the world!"
-      />
+      <PageHeader title="Leaderboard" subtitle="Compete with players around the world!" />
 
-      <Tabs<LeaderboardScope>
+      {/*<Tabs<LeaderboardScope>
         value={scope}
         onChange={setScope}
         options={[
@@ -116,17 +109,13 @@ export function LeaderboardPage() {
             icon: <Globe2 className="h-4 w-4" />,
           },
         ]}
-      />
+      />*/}
 
       {displayLoading && (
-        <Card className="px-4 py-6 text-center text-sm text-text-muted">
-          Loading leaderboard…
-        </Card>
+        <Card className="px-4 py-6 text-center text-sm text-text-muted">Loading leaderboard…</Card>
       )}
       {!displayLoading && displayError && (
-        <Card className="px-4 py-6 text-center text-sm text-accent-red">
-          {displayError}
-        </Card>
+        <Card className="px-4 py-6 text-center text-sm text-accent-red">{displayError}</Card>
       )}
       {!displayLoading && !displayError && entries.length === 0 && (
         <Card className="px-4 py-6 text-center text-sm text-text-muted">

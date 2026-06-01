@@ -1,16 +1,4 @@
-export type GroupId =
-  | 'A'
-  | 'B'
-  | 'C'
-  | 'D'
-  | 'E'
-  | 'F'
-  | 'G'
-  | 'H'
-  | 'I'
-  | 'J'
-  | 'K'
-  | 'L';
+export type GroupId = 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'H' | 'I' | 'J' | 'K' | 'L';
 
 export interface Team {
   id: string;
@@ -70,8 +58,11 @@ export type BadgeCategory =
   | 'predictions_made'
   | 'correct_predictions'
   | 'games_played'
-  | 'daily_streak'
-  | 'points_earned';
+  | 'trivia_master'
+  | 'good_guesser'
+  | 'matching_cards'
+  | 'group_master'
+  | 'bracket_master';
 
 export interface BadgeProgress {
   category: BadgeCategory;

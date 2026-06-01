@@ -20,8 +20,11 @@ export function ProfilePage() {
       // No backend counter yet for these; show 0 until tracked.
       correct_predictions: 0,
       games_played: user.stats.games_played,
-      daily_streak: 0,
-      points_earned: user.stats.total_score,
+      trivia_master: 0,
+      good_guesser: 0,
+      matching_cards: 0,
+      group_master: 0,
+      bracket_master: 0,
     };
     return BADGE_LADDERS.map((ladder) => ({
       ...ladder,

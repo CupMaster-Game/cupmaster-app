@@ -1,8 +1,19 @@
-import { Check, Lock, Target, CheckCircle2, Calendar, TrendingUp, Gamepad2 } from 'lucide-react';
-import type { BadgeProgress, BadgeTier } from '@/types';
-import { useAppStore } from '@/store/useAppStore';
-import { badgeKey } from '@/store/badgeKey';
 import { cn } from '@/lib/cn';
+import { badgeKey } from '@/store/badgeKey';
+import { useAppStore } from '@/store/useAppStore';
+import type { BadgeProgress, BadgeTier } from '@/types';
+import {
+  Check,
+  CheckCircle2,
+  FlagIcon,
+  Gamepad2,
+  HelpCircle,
+  Lock,
+  Table2,
+  Target,
+  Trophy,
+  UserCircle2,
+} from 'lucide-react';
 
 interface BadgeRowProps {
   badge: BadgeProgress;
@@ -22,12 +33,18 @@ const TIER_RING: Record<BadgeTier, string> = {
   gold: 'ring-accent-gold/60',
 };
 
-const CATEGORY_ICON: Record<BadgeProgress['category'], React.ComponentType<{ className?: string }>> = {
+const CATEGORY_ICON: Record<
+  BadgeProgress['category'],
+  React.ComponentType<{ className?: string }>
+> = {
   predictions_made: Target,
   correct_predictions: CheckCircle2,
   games_played: Gamepad2,
-  daily_streak: Calendar,
-  points_earned: TrendingUp,
+  trivia_master: HelpCircle,
+  good_guesser: UserCircle2,
+  matching_cards: FlagIcon,
+  group_master: Table2,
+  bracket_master: Trophy,
 };
 
 export function BadgeRow({ badge }: BadgeRowProps) {
@@ -43,9 +60,7 @@ export function BadgeRow({ badge }: BadgeRowProps) {
         <div>
           <h3 className="text-sm font-semibold">{badge.label}</h3>
           <p className="text-xs">
-            <span className="font-bold text-brand-400">
-              {badge.current.toLocaleString()}
-            </span>
+            <span className="font-bold text-brand-400">{badge.current.toLocaleString()}</span>
             <span className="text-text-muted">
               {' '}
               / {badge.thresholds.gold.toLocaleString()}
@@ -61,11 +76,7 @@ export function BadgeRow({ badge }: BadgeRowProps) {
           const claimed = claimedBadges[badgeKey(badge.category, tier)] === true;
           const next = TIER_ORDER[idx + 1];
           return (
-            <div
-              key={tier}
-              className="flex flex-col items-center"
-              style={{ width: '52px' }}
-            >
+            <div key={tier} className="flex flex-col items-center" style={{ width: '52px' }}>
               <button
                 type="button"
                 onClick={() => {
@@ -76,7 +87,7 @@ export function BadgeRow({ badge }: BadgeRowProps) {
                   'relative flex h-10 w-10 items-center justify-center rounded-lg transition-all',
                   achieved
                     ? `bg-bg-elevated ring-2 ${TIER_RING[tier]} ${claimed ? '' : 'hover:scale-110 cursor-pointer'}`
-                    : 'bg-bg-elevated/40 opacity-50',
+                    : 'bg-bg-elevated/40 opacity-50'
                 )}
                 aria-label={`${tier} badge`}
               >
