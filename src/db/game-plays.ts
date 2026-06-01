@@ -509,7 +509,7 @@ async function doFlushIngameActions(): Promise<void> {
                ${batch.map((e) => e.action_type)}::text[],
                ${batch.map((e) => e.intval)}::int[],
                ${batch.map((e) => e.textval)}::text[],
-               ${batch.map((e) => e.extra_data_json)}::jsonb[]
+               ${batch.map((e) => e.extra_data_json)}::text[]
              ) AS t(game_play_id, action_time, action_type, intval, textval, extra_data)
       WHERE  EXISTS (
                SELECT 1 FROM game_plays gp
