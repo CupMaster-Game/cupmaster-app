@@ -10,6 +10,8 @@ interface PredictionConfirmModalProps {
   open: boolean;
   onClose: () => void;
   onConfirm: () => void;
+  submitting?: boolean;
+  errorMessage?: string | null;
 }
 
 export function PredictionConfirmModal({
@@ -18,6 +20,8 @@ export function PredictionConfirmModal({
   open,
   onClose,
   onConfirm,
+  submitting = false,
+  errorMessage = null,
 }: PredictionConfirmModalProps) {
   if (!fixture || !pick || !fixture.team1 || !fixture.team2) {
     return (
@@ -45,11 +49,11 @@ export function PredictionConfirmModal({
       title="Confirm Your Prediction"
       footer={
         <>
-          <Button variant="secondary" onClick={onClose}>
+          <Button variant="secondary" onClick={onClose} disabled={submitting}>
             Cancel
           </Button>
-          <Button onClick={onConfirm} iconLeft={<span>🎯</span>}>
-            Lock In
+          <Button onClick={onConfirm} disabled={submitting} iconLeft={<span>🎯</span>}>
+            {submitting ? 'Locking In…' : 'Lock In'}
           </Button>
         </>
       }
@@ -72,6 +76,11 @@ export function PredictionConfirmModal({
         <p className="text-center text-xs text-text-muted">
           You can change your prediction until kickoff.
         </p>
+        {errorMessage && (
+          <p className="rounded-xl border border-accent-red/40 bg-accent-red/10 px-3 py-2 text-center text-xs text-accent-red">
+            {errorMessage}
+          </p>
+        )}
       </div>
     </Modal>
   );

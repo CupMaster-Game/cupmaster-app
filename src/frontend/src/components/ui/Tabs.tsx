@@ -1,5 +1,5 @@
-import type { ReactNode } from 'react';
 import { cn } from '@/lib/cn';
+import type { ReactNode } from 'react';
 
 export interface TabOption<T extends string> {
   value: T;
@@ -27,7 +27,7 @@ export function Tabs<T extends string>({
       <div
         className={cn(
           'flex gap-1 rounded-2xl border border-border-subtle bg-bg-subtle p-1',
-          className,
+          className
         )}
         role="tablist"
       >
@@ -39,12 +39,14 @@ export function Tabs<T extends string>({
               type="button"
               role="tab"
               aria-selected={active}
-              onClick={() => { onChange(opt.value); }}
+              onClick={() => {
+                onChange(opt.value);
+              }}
               className={cn(
-                'flex flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold transition-all',
+                'flex flex-1 items-center justify-center gap-1 rounded-xl px-3 py-2.5 text-sm font-semibold transition-all',
                 active
                   ? 'bg-brand-gradient text-bg-base shadow-glow-soft'
-                  : 'text-text-secondary hover:text-text-primary',
+                  : 'text-text-secondary hover:text-text-primary'
               )}
             >
               {opt.icon}
@@ -66,12 +68,14 @@ export function Tabs<T extends string>({
             type="button"
             role="tab"
             aria-selected={active}
-            onClick={() => { onChange(opt.value); }}
+            onClick={() => {
+              onChange(opt.value);
+            }}
             className={cn(
               'flex flex-1 items-center justify-center gap-2 border-b-2 px-3 py-3 text-sm font-medium transition-colors',
               active
                 ? 'border-brand-500 text-brand-400'
-                : 'border-transparent text-text-muted hover:text-text-primary',
+                : 'border-transparent text-text-muted hover:text-text-primary'
             )}
           >
             {opt.icon}

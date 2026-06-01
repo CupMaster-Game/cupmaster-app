@@ -3,7 +3,6 @@ import { Flag } from '@/components/ui/Flag';
 import { KNOCKOUT_BRACKET, type KnockoutMatch } from '@/data/standings';
 import { getTeam } from '@/data/teams';
 import { cn } from '@/lib/cn';
-import { useAppStore } from '@/store/useAppStore';
 
 const ROUND_LABEL: Record<KnockoutMatch['round'], string> = {
   r32: 'Round of 32',
@@ -13,19 +12,22 @@ const ROUND_LABEL: Record<KnockoutMatch['round'], string> = {
   final: 'Final',
 };
 
-export function KnockoutBracket() {
-  const { knockoutPredictions } = useAppStore();
+interface KnockoutBracketProps {
+  /** Mapping from local match id (e.g. "k32-1") to predicted winner team_id. */
+  picks: Record<string, string>;
+}
+
+export function KnockoutBracket({ picks }: KnockoutBracketProps) {
   const rounds: KnockoutMatch['round'][] = ['r32', 'r16', 'qf', 'sf', 'final'];
 
   function resolveTeam(matchId: string): string | null {
-    const pred = knockoutPredictions[matchId];
-    return pred?.winnerTeamId ?? null;
+    return picks[matchId] ?? null;
   }
 
   function renderMatch(m: KnockoutMatch) {
     const team1Id = m.team1Id ?? (m.team1FromMatchId ? resolveTeam(m.team1FromMatchId) : null);
     const team2Id = m.team2Id ?? (m.team2FromMatchId ? resolveTeam(m.team2FromMatchId) : null);
-    const winnerId = knockoutPredictions[m.id]?.winnerTeamId ?? null;
+    const winnerId = picks[m.id] ?? null;
 
     return (
       <div key={m.id} className="rounded-xl border border-border-subtle bg-bg-subtle p-2">

@@ -1,9 +1,7 @@
-import { useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, Check } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
-import type { GroupId } from '@/types';
-import { useAppStore } from '@/store/useAppStore';
 import { cn } from '@/lib/cn';
 import type { GroupTableTeam } from '@/components/standings/GroupTable';
 
@@ -12,21 +10,39 @@ export interface WizardGroup {
   teams: readonly GroupTableTeam[];
 }
 
+export type GroupPicks = Record<string, readonly string[]>;
+
 interface GroupPredictionWizardProps {
   open: boolean;
   onClose: () => void;
   groups: readonly WizardGroup[];
+  initialPicks?: GroupPicks;
+  onSubmit: (picks: GroupPicks) => Promise<{ ok: boolean; error?: string }>;
 }
 
 export function GroupPredictionWizard({
   open,
   onClose,
   groups,
+  initialPicks,
+  onSubmit,
 }: GroupPredictionWizardProps) {
-  const { setGroupOrder } = useAppStore();
   const [stepIdx, setStepIdx] = useState(0);
-  const [picks, setPicks] = useState<Record<string, readonly string[]>>({});
-  const [done, setDone] = useState(false);
+  const [picks, setPicks] = useState<GroupPicks>(initialPicks ?? {});
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Reset wizard state each time the modal is opened, so reopening after a
+    // refresh picks up the latest server-side prediction.
+    /* eslint-disable react-hooks/set-state-in-effect */
+    if (open) {
+      setPicks(initialPicks ?? {});
+      setStepIdx(0);
+      setError(null);
+    }
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, [open, initialPicks]);
 
   const currentGroup = groups[stepIdx];
   const totalSteps = groups.length;
@@ -55,22 +71,21 @@ export function GroupPredictionWizard({
     }
   }
 
-  function next() {
+  async function next() {
     if (!isComplete || !groupName) return;
     if (stepIdx < totalSteps - 1) {
       setStepIdx(stepIdx + 1);
-    } else {
-      // submit all
-      for (const g of groups) {
-        const p = picks[g.groupName];
-        if (p?.length === 4) {
-          const [a, b, c, d] = p;
-          if (a && b && c && d)
-            setGroupOrder(g.groupName as GroupId, [a, b, c, d]);
-        }
-      }
-      setDone(true);
+      return;
     }
+    setSubmitting(true);
+    setError(null);
+    const result = await onSubmit(picks);
+    setSubmitting(false);
+    if (!result.ok) {
+      setError(result.error ?? 'Failed to submit. Please try again.');
+      return;
+    }
+    onClose();
   }
 
   function back() {
@@ -79,32 +94,11 @@ export function GroupPredictionWizard({
   }
 
   function close() {
+    if (submitting) return;
     onClose();
     setStepIdx(0);
-    setPicks({});
-    setDone(false);
-  }
-
-  if (done) {
-    return (
-      <Modal open={open} onClose={close} title="Predictions Submitted!">
-        <div className="space-y-4 text-center">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-brand-500/15">
-            <Check className="h-8 w-8 text-brand-400" />
-          </div>
-          <p className="text-base font-semibold">
-            All {totalSteps} group predictions saved.
-          </p>
-          <p className="text-sm text-text-muted">
-            Earn points for each correct team position when the group stage
-            finishes.
-          </p>
-          <Button fullWidth onClick={close}>
-            Done
-          </Button>
-        </div>
-      </Modal>
-    );
+    setPicks(initialPicks ?? {});
+    setError(null);
   }
 
   return (
@@ -117,19 +111,23 @@ export function GroupPredictionWizard({
           <Button
             variant="secondary"
             onClick={back}
-            disabled={stepIdx === 0}
+            disabled={stepIdx === 0 || submitting}
             iconLeft={<ChevronLeft className="h-4 w-4" />}
             className="whitespace-nowrap"
           >
             Back
           </Button>
           <Button
-            onClick={next}
-            disabled={!isComplete}
+            onClick={() => { void next(); }}
+            disabled={!isComplete || submitting}
             iconRight={<ChevronRight className="h-4 w-4" />}
             className="whitespace-nowrap"
           >
-            {stepIdx === totalSteps - 1 ? 'Finish' : 'Next'}
+            {submitting
+              ? 'Submitting…'
+              : stepIdx === totalSteps - 1
+                ? 'Finish'
+                : 'Next'}
           </Button>
         </>
       }
@@ -201,25 +199,29 @@ export function GroupPredictionWizard({
             Clear order
           </button>
         )}
+
+        {error && (
+          <p className="rounded-xl border border-accent-red/40 bg-accent-red/10 px-3 py-2 text-center text-xs text-accent-red">
+            {error}
+          </p>
+        )}
       </div>
     </Modal>
   );
 }
 
 export function GroupSummary({
-  group,
   teams,
+  prediction,
 }: {
-  group: string;
   teams: readonly GroupTableTeam[];
+  prediction?: readonly string[];
 }) {
-  const { groupPredictions } = useAppStore();
-  const pred = groupPredictions[group as GroupId];
-  if (!pred) return null;
+  if (!prediction || prediction.length === 0) return null;
   const teamsById = new Map(teams.map((t) => [t.team_id, t]));
   return (
     <div className="flex items-center gap-1.5">
-      {pred.map((id, idx) => {
+      {prediction.map((id, idx) => {
         const team = teamsById.get(id);
         if (!team) return null;
         return (

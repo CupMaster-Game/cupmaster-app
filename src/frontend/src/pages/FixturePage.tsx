@@ -12,13 +12,9 @@ import {
   isSameDay,
   startOfDay,
 } from '@/lib/date';
-import { useAppStore } from '@/store/useAppStore';
+import { usePredictions } from '@/hooks/usePredictions';
 import { cn } from '@/lib/cn';
-import type { ApiFixture, MatchOutcome } from '@/types';
-
-function fixtureKey(fixture: ApiFixture): string {
-  return String(fixture.match_number);
-}
+import type { ApiFixture, MatchOutcome, MatchPrediction } from '@/types';
 
 export function FixturePage() {
   const today = useMemo(() => startOfDay(new Date()), []);
@@ -30,7 +26,9 @@ export function FixturePage() {
     fixture: ApiFixture;
     pick: MatchOutcome;
   } | null>(null);
-  const { predictions, setMatchPrediction } = useAppStore();
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const { predictions, submitPrediction } = usePredictions();
 
   useEffect(() => {
     let cancelled = false;
@@ -57,6 +55,18 @@ export function FixturePage() {
     };
   }, []);
 
+  const predictionByMatchNumber = useMemo(() => {
+    const map: Record<string, MatchPrediction> = {};
+    for (const p of predictions.match_predictions) {
+      map[String(p.match_number)] = {
+        matchId: String(p.match_number),
+        pick: p.result,
+        predictedAt: p.predicted_at,
+      };
+    }
+    return map;
+  }, [predictions.match_predictions]);
+
   const relativeLabel = getRelativeDayLabel(selected, today);
   const longDate = formatLongDate(selected);
   const headerLabel = relativeLabel
@@ -69,9 +79,6 @@ export function FixturePage() {
       .sort((a, b) => a.match_time.localeCompare(b.match_time));
   }, [fixtures, selected]);
 
-  // Extend the date scroller to cover every loaded fixture so the user can
-  // navigate to any tournament day (group stage through final). Falls back to
-  // the DateScroller defaults until fixtures load.
   const dateRange = useMemo(() => {
     if (fixtures.length === 0) return { before: undefined, after: undefined };
     const DAY_MS = 1000 * 60 * 60 * 24;
@@ -90,6 +97,27 @@ export function FixturePage() {
   }, [fixtures, today]);
 
   const isOnToday = isSameDay(selected, today);
+
+  async function handleConfirm() {
+    if (!pending) return;
+    setSubmitting(true);
+    setSubmitError(null);
+    const matchNumber = pending.fixture.match_number;
+    const hasExisting = predictionByMatchNumber[String(matchNumber)] !== undefined;
+    const result = await submitPrediction(
+      {
+        type: 'match_prediction',
+        data: { match_number: matchNumber, result: pending.pick },
+      },
+      hasExisting ? 'submitChange' : 'submit'
+    );
+    setSubmitting(false);
+    if (!result.ok) {
+      setSubmitError(result.error);
+      return;
+    }
+    setPending(null);
+  }
 
   return (
     <div className="space-y-5 pb-4">
@@ -143,10 +171,13 @@ export function FixturePage() {
         {!loading && !error &&
           todayFixtures.map((f) => (
             <MatchCard
-              key={fixtureKey(f)}
+              key={f.match_number}
               fixture={f}
-              prediction={predictions[fixtureKey(f)]}
-              onPredictClick={(fixture, pick) => { setPending({ fixture, pick }); }}
+              prediction={predictionByMatchNumber[String(f.match_number)]}
+              onPredictClick={(fixture, pick) => {
+                setSubmitError(null);
+                setPending({ fixture, pick });
+              }}
             />
           ))}
       </div>
@@ -155,12 +186,15 @@ export function FixturePage() {
         fixture={pending?.fixture ?? null}
         pick={pending?.pick ?? null}
         open={pending !== null}
-        onClose={() => { setPending(null); }}
+        submitting={submitting}
+        errorMessage={submitError}
+        onClose={() => {
+          if (submitting) return;
+          setPending(null);
+          setSubmitError(null);
+        }}
         onConfirm={() => {
-          if (pending) {
-            setMatchPrediction(fixtureKey(pending.fixture), pending.pick);
-            setPending(null);
-          }
+          void handleConfirm();
         }}
       />
     </div>

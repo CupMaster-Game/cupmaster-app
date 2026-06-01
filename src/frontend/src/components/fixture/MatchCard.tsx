@@ -48,9 +48,9 @@ export function MatchCard({ fixture, prediction, onPredictClick }: MatchCardProp
       >
         {isFinished || isLive ? statusLabel : formatTime(kickoff)}
       </span>
-      <div className="flex items-center gap-3 px-4 pt-6">
+      <div className="flex items-center gap-3 px-1 pt-6">
         <div className="flex flex-1 items-center justify-end gap-2 text-right">
-          <span className="text-sm font-semibold leading-tight">{team1Name}</span>
+          <span className="text-sm leading-tight">{team1Name}</span>
           <TeamLogo team={team1} />
         </div>
         <div className="flex w-16 flex-col items-center text-center">
@@ -70,7 +70,7 @@ export function MatchCard({ fixture, prediction, onPredictClick }: MatchCardProp
         </div>
         <div className="flex flex-1 items-center gap-2">
           <TeamLogo team={team2} />
-          <span className="text-sm font-semibold leading-tight">{team2Name}</span>
+          <span className="text-sm leading-tight">{team2Name}</span>
         </div>
       </div>
 
@@ -78,34 +78,31 @@ export function MatchCard({ fixture, prediction, onPredictClick }: MatchCardProp
         <PickButton
           label={`${team1Name} Win`}
           icon={<Crown className="h-3.5 w-3.5" />}
-          color="brand"
           active={prediction?.pick === 'team1'}
           actual={actualOutcome === 'team1'}
           finished={isFinished}
           wasCorrect={prediction?.pick === 'team1' ? wasCorrect : null}
-          disabled={isFinished || isLive || !hasTeams}
+          disabled={isFinished || isLive || !hasTeams || prediction?.pick === 'team1'}
           onClick={() => onPredictClick?.(fixture, 'team1')}
         />
         <PickButton
           label="Draw"
           icon={<Minus className="h-3.5 w-3.5" />}
-          color="neutral"
           active={prediction?.pick === 'draw'}
           actual={actualOutcome === 'draw'}
           finished={isFinished}
           wasCorrect={prediction?.pick === 'draw' ? wasCorrect : null}
-          disabled={isFinished || isLive || !hasTeams}
+          disabled={isFinished || isLive || !hasTeams || prediction?.pick === 'draw'}
           onClick={() => onPredictClick?.(fixture, 'draw')}
         />
         <PickButton
           label={`${team2Name} Win`}
           icon={<Crown className="h-3.5 w-3.5" />}
-          color="blue"
           active={prediction?.pick === 'team2'}
           actual={actualOutcome === 'team2'}
           finished={isFinished}
           wasCorrect={prediction?.pick === 'team2' ? wasCorrect : null}
-          disabled={isFinished || isLive || !hasTeams}
+          disabled={isFinished || isLive || !hasTeams || prediction?.pick === 'team2'}
           onClick={() => onPredictClick?.(fixture, 'team2')}
         />
       </div>
@@ -136,7 +133,6 @@ function TeamLogo({ team }: { team: ApiFixtureTeam | null }) {
 interface PickButtonProps {
   label: string;
   icon: React.ReactNode;
-  color: 'brand' | 'blue' | 'neutral';
   active: boolean;
   actual: boolean;
   finished: boolean;
@@ -148,7 +144,6 @@ interface PickButtonProps {
 function PickButton({
   label,
   icon,
-  color,
   active,
   actual,
   finished,
@@ -156,14 +151,11 @@ function PickButton({
   disabled,
   onClick,
 }: PickButtonProps) {
-  const colorStyle =
-    color === 'brand'
-      ? 'border-brand-500/40 text-brand-400'
-      : color === 'blue'
-        ? 'border-accent-blue/40 text-accent-blue'
-        : 'border-border-default text-text-secondary';
+  // Resting/unpicked style is always the faint neutral look (matches the
+  // draw button). Picked state overrides background + border + text below.
+  const restingStyle = 'border-border-default bg-bg-subtle text-text-secondary';
 
-  let stateStyle = '';
+  let stateStyle = restingStyle;
   let statusIcon: React.ReactNode = null;
 
   if (finished) {
@@ -176,15 +168,10 @@ function PickButton({
     } else if (actual) {
       stateStyle = 'border-brand-500/40 bg-brand-500/5 text-text-secondary';
     } else {
-      stateStyle = 'opacity-60';
+      stateStyle = `${restingStyle} opacity-60`;
     }
   } else if (active) {
-    stateStyle =
-      color === 'brand'
-        ? 'border-brand-500 bg-brand-500/15 text-brand-300 shadow-glow-soft'
-        : color === 'blue'
-          ? 'border-accent-blue bg-accent-blue/15 text-accent-blue'
-          : 'border-border-strong bg-bg-elevated text-text-primary';
+    stateStyle = 'border-accent-blue bg-accent-blue/30 text-text-primary shadow-glow-soft';
   }
 
   return (
@@ -193,8 +180,7 @@ function PickButton({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        'flex items-center justify-center gap-1.5 rounded-xl border bg-bg-subtle px-2 py-2.5 text-xs font-semibold transition-all active:scale-[0.98]',
-        colorStyle,
+        'flex items-center justify-center gap-1.5 rounded-xl border px-2 py-2.5 text-xs font-semibold transition-all active:scale-[0.98]',
         stateStyle,
         disabled && 'cursor-not-allowed'
       )}

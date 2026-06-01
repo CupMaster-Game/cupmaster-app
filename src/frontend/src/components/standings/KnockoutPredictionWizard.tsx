@@ -4,9 +4,8 @@ import { Modal } from '@/components/ui/Modal';
 import { KNOCKOUT_BRACKET, type KnockoutMatch } from '@/data/standings';
 import { getTeam } from '@/data/teams';
 import { cn } from '@/lib/cn';
-import { useAppStore } from '@/store/useAppStore';
 import { Check, ChevronRight, Trophy } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 const ROUNDS: readonly { key: KnockoutMatch['round']; label: string }[] = [
   { key: 'r32', label: 'Round of 32' },
@@ -16,16 +15,39 @@ const ROUNDS: readonly { key: KnockoutMatch['round']; label: string }[] = [
   { key: 'final', label: 'Final' },
 ];
 
+export type KnockoutPicks = Record<string, string>;
+
 interface KnockoutPredictionWizardProps {
   open: boolean;
   onClose: () => void;
+  initialPicks?: KnockoutPicks;
+  onSubmit: (picks: KnockoutPicks) => Promise<{ ok: boolean; error?: string }>;
 }
 
-export function KnockoutPredictionWizard({ open, onClose }: KnockoutPredictionWizardProps) {
-  const { setKnockoutWinner } = useAppStore();
-  const [picks, setPicks] = useState<Record<string, string>>({});
+export function KnockoutPredictionWizard({
+  open,
+  onClose,
+  initialPicks,
+  onSubmit,
+}: KnockoutPredictionWizardProps) {
+  const [picks, setPicks] = useState<KnockoutPicks>(initialPicks ?? {});
   const [stepIdx, setStepIdx] = useState(0);
   const [done, setDone] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Reset wizard state each time the modal is opened, so reopening after a
+    // refresh picks up the latest server-side prediction.
+    /* eslint-disable react-hooks/set-state-in-effect */
+    if (open) {
+      setPicks(initialPicks ?? {});
+      setStepIdx(0);
+      setDone(false);
+      setError(null);
+    }
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, [open, initialPicks]);
 
   const currentRound = ROUNDS[stepIdx];
 
@@ -48,24 +70,30 @@ export function KnockoutPredictionWizard({ open, onClose }: KnockoutPredictionWi
 
   const allPicked = roundMatches.every((m) => Boolean(picks[m.id]));
 
-  function next() {
+  async function next() {
     if (!allPicked) return;
     if (stepIdx < ROUNDS.length - 1) {
       setStepIdx(stepIdx + 1);
-    } else {
-      // Commit
-      for (const [matchId, winner] of Object.entries(picks)) {
-        setKnockoutWinner(matchId, winner);
-      }
-      setDone(true);
+      return;
     }
+    setSubmitting(true);
+    setError(null);
+    const result = await onSubmit(picks);
+    setSubmitting(false);
+    if (!result.ok) {
+      setError(result.error ?? 'Failed to submit. Please try again.');
+      return;
+    }
+    setDone(true);
   }
 
   function close() {
+    if (submitting) return;
     onClose();
-    setPicks({});
+    setPicks(initialPicks ?? {});
     setStepIdx(0);
     setDone(false);
+    setError(null);
   }
 
   if (done) {
@@ -100,8 +128,16 @@ export function KnockoutPredictionWizard({ open, onClose }: KnockoutPredictionWi
       onClose={close}
       title={currentRound.label}
       footer={
-        <Button onClick={next} disabled={!allPicked} fullWidth>
-          {stepIdx === ROUNDS.length - 1 ? 'Lock In Champion' : 'Next Round'}
+        <Button
+          onClick={() => { void next(); }}
+          disabled={!allPicked || submitting}
+          fullWidth
+        >
+          {submitting
+            ? 'Submitting…'
+            : stepIdx === ROUNDS.length - 1
+              ? 'Lock In Champion'
+              : 'Next Round'}
           <ChevronRight className="h-4 w-4" />
         </Button>
       }
@@ -155,6 +191,11 @@ export function KnockoutPredictionWizard({ open, onClose }: KnockoutPredictionWi
             );
           })}
         </div>
+        {error && (
+          <p className="rounded-xl border border-accent-red/40 bg-accent-red/10 px-3 py-2 text-center text-xs text-accent-red">
+            {error}
+          </p>
+        )}
       </div>
     </Modal>
   );

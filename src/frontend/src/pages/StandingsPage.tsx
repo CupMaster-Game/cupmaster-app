@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ClipboardList, Table2, Trophy } from 'lucide-react';
+import { useAccount } from 'wagmi';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Tabs } from '@/components/ui/Tabs';
 import { Card } from '@/components/ui/Card';
@@ -8,10 +9,16 @@ import { GroupTable, type GroupTableTeam } from '@/components/standings/GroupTab
 import {
   GroupPredictionWizard,
   GroupSummary,
+  type GroupPicks,
 } from '@/components/standings/GroupPredictionWizard';
 import { KnockoutBracket } from '@/components/standings/KnockoutBracket';
-import { KnockoutPredictionWizard } from '@/components/standings/KnockoutPredictionWizard';
-import { api } from '@/lib/api';
+import {
+  KnockoutPredictionWizard,
+  type KnockoutPicks,
+} from '@/components/standings/KnockoutPredictionWizard';
+import { api, getAuthedApi } from '@/lib/api';
+import { usePlayGame } from '@/hooks/usePlayGame';
+import { usePredictions } from '@/hooks/usePredictions';
 
 interface ApiTeam {
   team_id: string;
@@ -25,17 +32,43 @@ interface ApiTeam {
 type StandingsTab = 'groups' | 'knockout';
 
 function groupKeyFromName(groupName: string): string {
-  // "Group A" -> "A"
   return groupName.replace(/^Group\s+/i, '').trim();
 }
 
+// Knockout bracket local IDs (k32-1..k32-16, k16-1..k16-8, kqf-1..kqf-4,
+// ksf-1..ksf-2, kfinal) → match_schedules.match_number. Mirrors FIFA's 2026
+// numbering (matches 73-104 cover the knockout stage, with 103 reserved for
+// the 3rd-place playoff which the bracket does not include).
+const KNOCKOUT_ID_TO_MATCH_NUMBER: Record<string, number> = (() => {
+  const m: Record<string, number> = {};
+  for (let i = 0; i < 16; i++) m[`k32-${(i + 1).toString()}`] = 73 + i;
+  for (let i = 0; i < 8; i++) m[`k16-${(i + 1).toString()}`] = 89 + i;
+  for (let i = 0; i < 4; i++) m[`kqf-${(i + 1).toString()}`] = 97 + i;
+  for (let i = 0; i < 2; i++) m[`ksf-${(i + 1).toString()}`] = 101 + i;
+  m.kfinal = 104;
+  return m;
+})();
+
+const MATCH_NUMBER_TO_KNOCKOUT_ID: Record<number, string> = Object.fromEntries(
+  Object.entries(KNOCKOUT_ID_TO_MATCH_NUMBER).map(([k, v]) => [v, k])
+);
+
+const GAME_TYPE_GROUP = 202 as const;
+const GAME_TYPE_KNOCKOUT = 203 as const;
+
 export function StandingsPage() {
+  const { address } = useAccount();
   const [tab, setTab] = useState<StandingsTab>('groups');
   const [groupWizardOpen, setGroupWizardOpen] = useState(false);
   const [knockoutWizardOpen, setKnockoutWizardOpen] = useState(false);
   const [teams, setTeams] = useState<ApiTeam[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState<null | 'group' | 'knockout'>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  const { predictions, submitPrediction } = usePredictions();
+  const { buyEnergy, buyError, resetBuyError } = usePlayGame();
 
   useEffect(() => {
     let cancelled = false;
@@ -85,6 +118,117 @@ export function StandingsPage() {
       .sort((a, b) => a.groupName.localeCompare(b.groupName));
   }, [teams]);
 
+  const groupInitialPicks = useMemo<GroupPicks>(() => {
+    if (!predictions.group_prediction) return {};
+    const out: GroupPicks = {};
+    for (const s of predictions.group_prediction.standings) {
+      out[s.group_name] = s.ordered_teams;
+    }
+    return out;
+  }, [predictions.group_prediction]);
+
+  const knockoutInitialPicks = useMemo<KnockoutPicks>(() => {
+    if (!predictions.knockout_prediction) return {};
+    const out: KnockoutPicks = {};
+    for (const r of predictions.knockout_prediction.match_results) {
+      const localId = MATCH_NUMBER_TO_KNOCKOUT_ID[r.match_number];
+      if (localId) out[localId] = r.winner_team_id;
+    }
+    return out;
+  }, [predictions.knockout_prediction]);
+
+  const hasGroupPrediction = predictions.group_prediction !== null;
+  const hasKnockoutPrediction = predictions.knockout_prediction !== null;
+
+  async function ensureEnergyAndOpen(
+    gameType: typeof GAME_TYPE_GROUP | typeof GAME_TYPE_KNOCKOUT,
+    hasExisting: boolean,
+    open: () => void
+  ) {
+    setActionError(null);
+    resetBuyError();
+    setBusy(gameType === GAME_TYPE_GROUP ? 'group' : 'knockout');
+
+    try {
+      // If a prediction already exists, no energy is needed — the wizard will
+      // submit via submitChange.
+      if (hasExisting) {
+        open();
+        return;
+      }
+
+      const authed = getAuthedApi(address);
+      if (!authed) {
+        setActionError('Please connect your wallet first.');
+        return;
+      }
+      const energyRes = await authed.user.numbers.$get();
+      let energy = 0;
+      if (energyRes.ok) {
+        const body = (await energyRes.json()) as { energies: Record<string, number> };
+        energy = body.energies[String(gameType)] ?? 0;
+      }
+
+      if (energy <= 0) {
+        const ok = await buyEnergy(gameType);
+        if (!ok) return;
+      }
+
+      open();
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  const handleGroupSubmit = useCallback(
+    async (picks: GroupPicks): Promise<{ ok: boolean; error?: string }> => {
+      const standings = Object.entries(picks)
+        .filter(([, ordered]) => ordered.length > 0)
+        .map(([group_name, ordered]) => ({
+          group_name,
+          ordered_teams: [...ordered],
+        }));
+      const result = await submitPrediction(
+        { type: 'group_prediction', data: { standings } },
+        hasGroupPrediction ? 'submitChange' : 'submit'
+      );
+      return result.ok
+        ? { ok: true }
+        : { ok: false, error: result.error };
+    },
+    [submitPrediction, hasGroupPrediction]
+  );
+
+  const handleKnockoutSubmit = useCallback(
+    async (picks: KnockoutPicks): Promise<{ ok: boolean; error?: string }> => {
+      const match_results = Object.entries(picks)
+        .map(([localId, winner_team_id]) => {
+          const match_number = KNOCKOUT_ID_TO_MATCH_NUMBER[localId];
+          if (match_number === undefined) return null;
+          return { match_number, winner_team_id };
+        })
+        .filter((v): v is { match_number: number; winner_team_id: string } => v !== null);
+      const result = await submitPrediction(
+        { type: 'knockout_bracket_prediction', data: { match_results } },
+        hasKnockoutPrediction ? 'submitChange' : 'submit'
+      );
+      return result.ok
+        ? { ok: true }
+        : { ok: false, error: result.error };
+    },
+    [submitPrediction, hasKnockoutPrediction]
+  );
+
+  const buyErrorMsg =
+    buyError === 'insufficient_balance'
+      ? 'Not enough balance to buy energy. Please top up USDT/USDC/USDm.'
+      : buyError === 'submit_failed'
+        ? 'Purchase confirmed on-chain but failed to register. Try again in a moment.'
+        : buyError === 'no_wallet'
+          ? 'Please connect your wallet first.'
+          : null;
+  const displayError = actionError ?? buyErrorMsg;
+
   return (
     <div className="space-y-4 pb-4">
       <PageHeader title="Standings" subtitle="FIFA World Cup 2026™" />
@@ -98,15 +242,31 @@ export function StandingsPage() {
         ]}
       />
 
+      {displayError && (
+        <div className="rounded-xl border border-accent-red/40 bg-accent-red/10 p-3 text-sm text-accent-red">
+          {displayError}
+        </div>
+      )}
+
       {tab === 'groups' && (
         <>
           <PredictionPrompt
             icon={<ClipboardList className="h-6 w-6 text-accent-purple" />}
-            title="Create Your Custom Standings"
+            title={hasGroupPrediction ? 'Update Your Standings' : 'Create Your Custom Standings'}
             description="Predict how each group will finish and compete with others!"
-            ctaLabel="Create Now"
-            disabled={loading || !!error || groups.length === 0}
-            onCta={() => { setGroupWizardOpen(true); }}
+            ctaLabel={
+              busy === 'group'
+                ? 'Working…'
+                : hasGroupPrediction
+                  ? 'Edit'
+                  : 'Create Now'
+            }
+            disabled={loading || !!error || groups.length === 0 || busy !== null}
+            onCta={() => {
+              void ensureEnergyAndOpen(GAME_TYPE_GROUP, hasGroupPrediction, () => {
+                setGroupWizardOpen(true);
+              });
+            }}
           />
           {loading && (
             <Card className="px-4 py-6 text-center text-sm text-text-muted">
@@ -123,7 +283,10 @@ export function StandingsPage() {
               {groups.map(({ groupName, teams: groupTeams }) => (
                 <div key={groupName} className="space-y-2">
                   <GroupTable group={groupName} teams={groupTeams} />
-                  <GroupSummary group={groupName} teams={groupTeams} />
+                  <GroupSummary
+                    teams={groupTeams}
+                    prediction={groupInitialPicks[groupName]}
+                  />
                 </div>
               ))}
             </div>
@@ -132,6 +295,8 @@ export function StandingsPage() {
             open={groupWizardOpen}
             onClose={() => { setGroupWizardOpen(false); }}
             groups={groups}
+            initialPicks={groupInitialPicks}
+            onSubmit={handleGroupSubmit}
           />
         </>
       )}
@@ -140,16 +305,22 @@ export function StandingsPage() {
         <>
           <PredictionPrompt
             icon={<Trophy className="h-6 w-6 text-accent-orange" />}
-            title="Predict the Knockout"
+            title={hasKnockoutPrediction ? 'Update Your Bracket' : 'Predict the Knockout'}
             description="Pick winners round-by-round, all the way to the trophy."
             ctaLabel="Start Bracket"
             disabled
-            onCta={() => { setKnockoutWizardOpen(true); }}
+            onCta={() => {
+              void ensureEnergyAndOpen(GAME_TYPE_KNOCKOUT, hasKnockoutPrediction, () => {
+                setKnockoutWizardOpen(true);
+              });
+            }}
           />
-          <KnockoutBracket />
+          <KnockoutBracket picks={knockoutInitialPicks} />
           <KnockoutPredictionWizard
             open={knockoutWizardOpen}
             onClose={() => { setKnockoutWizardOpen(false); }}
+            initialPicks={knockoutInitialPicks}
+            onSubmit={handleKnockoutSubmit}
           />
         </>
       )}
