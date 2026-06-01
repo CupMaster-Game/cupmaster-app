@@ -32,7 +32,7 @@ INSERT INTO teams (api_team_id, team_name, country_code, logo, group_name) VALUE
   (28, 'Tunisia', 'TUN', '28.png', 'Group F'),
   (31, 'Morocco', 'MAR', '31.png', 'Group C'),
   (32, 'Egypt', 'EGY', '32.png', 'Group G'),
-  (770, 'Czech Republic', 'CZE', '770.png', 'Group A'),
+  (770, 'Czechia', 'CZE', '770.png', 'Group A'),
   (775, 'Austria', 'AUT', '775.png', 'Group J'),
   (777, 'Türkiye', 'TUR', '777.png', 'Group D'),
   (1090, 'Norway', 'NOR', '1090.png', 'Group I'),
