@@ -21,6 +21,7 @@ interface KnockoutPredictionWizardProps {
   open: boolean;
   onClose: () => void;
   initialPicks?: KnockoutPicks;
+  requiresPayment?: boolean;
   onSubmit: (picks: KnockoutPicks) => Promise<{ ok: boolean; error?: string }>;
 }
 
@@ -28,6 +29,7 @@ export function KnockoutPredictionWizard({
   open,
   onClose,
   initialPicks,
+  requiresPayment,
   onSubmit,
 }: KnockoutPredictionWizardProps) {
   const [picks, setPicks] = useState<KnockoutPicks>(initialPicks ?? {});
@@ -136,7 +138,9 @@ export function KnockoutPredictionWizard({
           {submitting
             ? 'Submitting…'
             : stepIdx === ROUNDS.length - 1
-              ? 'Lock In Champion'
+              ? requiresPayment
+                ? 'Lock In Champion (0.05$)'
+                : 'Lock In Champion'
               : 'Next Round'}
           <ChevronRight className="h-4 w-4" />
         </Button>

@@ -64,8 +64,9 @@ export function StandingsPage() {
   const [teams, setTeams] = useState<ApiTeam[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState<null | 'group' | 'knockout'>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [groupRequiresPayment, setGroupRequiresPayment] = useState(false);
+  const [knockoutRequiresPayment, setKnockoutRequiresPayment] = useState(false);
 
   const { predictions, submitPrediction } = usePredictions();
   const { buyEnergy, buyError, resetBuyError } = usePlayGame();
@@ -140,48 +141,77 @@ export function StandingsPage() {
   const hasGroupPrediction = predictions.group_prediction !== null;
   const hasKnockoutPrediction = predictions.knockout_prediction !== null;
 
-  async function ensureEnergyAndOpen(
-    gameType: typeof GAME_TYPE_GROUP | typeof GAME_TYPE_KNOCKOUT,
-    hasExisting: boolean,
-    open: () => void
-  ) {
-    setActionError(null);
-    resetBuyError();
-    setBusy(gameType === GAME_TYPE_GROUP ? 'group' : 'knockout');
-
-    try {
-      // If a prediction already exists, no energy is needed — the wizard will
-      // submit via submitChange.
-      if (hasExisting) {
-        open();
-        return;
-      }
-
-      const authed = getAuthedApi(address);
-      if (!authed) {
-        setActionError('Please connect your wallet first.');
-        return;
-      }
-      const energyRes = await authed.user.numbers.$get();
-      let energy = 0;
-      if (energyRes.ok) {
-        const body = (await energyRes.json()) as { energies: Record<string, number> };
-        energy = body.energies[String(gameType)] ?? 0;
-      }
-
-      if (energy <= 0) {
-        const ok = await buyEnergy(gameType);
-        if (!ok) return;
-      }
-
-      open();
-    } finally {
-      setBusy(null);
+  // When a wizard opens for a brand-new prediction, check whether the user has
+  // energy. If not, the Finish button shows the 0.05$ cost so the user knows
+  // the buy transaction will be triggered on submit.
+  useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect */
+    if (!groupWizardOpen || hasGroupPrediction) {
+      setGroupRequiresPayment(false);
+      return;
     }
-  }
+    const authed = getAuthedApi(address);
+    if (!authed) return;
+    let cancelled = false;
+    void authed.user.numbers.$get().then(async (res) => {
+      if (!res.ok) return;
+      const body = (await res.json()) as { energies: Record<string, number> };
+      const energy = body.energies[String(GAME_TYPE_GROUP)] ?? 0;
+      if (cancelled) return;
+      setGroupRequiresPayment(energy <= 0);
+    });
+    return () => {
+      cancelled = true;
+    };
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, [groupWizardOpen, hasGroupPrediction, address]);
+
+  useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect */
+    if (!knockoutWizardOpen || hasKnockoutPrediction) {
+      setKnockoutRequiresPayment(false);
+      return;
+    }
+    const authed = getAuthedApi(address);
+    if (!authed) return;
+    let cancelled = false;
+    void authed.user.numbers.$get().then(async (res) => {
+      if (!res.ok) return;
+      const body = (await res.json()) as { energies: Record<string, number> };
+      const energy = body.energies[String(GAME_TYPE_KNOCKOUT)] ?? 0;
+      if (cancelled) return;
+      setKnockoutRequiresPayment(energy <= 0);
+    });
+    return () => {
+      cancelled = true;
+    };
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, [knockoutWizardOpen, hasKnockoutPrediction, address]);
 
   const handleGroupSubmit = useCallback(
     async (picks: GroupPicks): Promise<{ ok: boolean; error?: string }> => {
+      // For new submissions (not edits), ensure energy first — buying it on
+      // demand if the user has none. Editing an existing prediction does not
+      // consume energy.
+      if (!hasGroupPrediction) {
+        const authed = getAuthedApi(address);
+        if (!authed) {
+          return { ok: false, error: 'Please connect your wallet first.' };
+        }
+        const energyRes = await authed.user.numbers.$get();
+        let energy = 0;
+        if (energyRes.ok) {
+          const body = (await energyRes.json()) as { energies: Record<string, number> };
+          energy = body.energies[String(GAME_TYPE_GROUP)] ?? 0;
+        }
+        if (energy <= 0) {
+          const ok = await buyEnergy(GAME_TYPE_GROUP);
+          if (!ok) {
+            return { ok: false, error: 'Failed to buy energy. Please try again.' };
+          }
+        }
+      }
+
       const standings = Object.entries(picks)
         .filter(([, ordered]) => ordered.length > 0)
         .map(([group_name, ordered]) => ({
@@ -196,11 +226,30 @@ export function StandingsPage() {
         ? { ok: true }
         : { ok: false, error: result.error };
     },
-    [submitPrediction, hasGroupPrediction]
+    [submitPrediction, hasGroupPrediction, address, buyEnergy]
   );
 
   const handleKnockoutSubmit = useCallback(
     async (picks: KnockoutPicks): Promise<{ ok: boolean; error?: string }> => {
+      if (!hasKnockoutPrediction) {
+        const authed = getAuthedApi(address);
+        if (!authed) {
+          return { ok: false, error: 'Please connect your wallet first.' };
+        }
+        const energyRes = await authed.user.numbers.$get();
+        let energy = 0;
+        if (energyRes.ok) {
+          const body = (await energyRes.json()) as { energies: Record<string, number> };
+          energy = body.energies[String(GAME_TYPE_KNOCKOUT)] ?? 0;
+        }
+        if (energy <= 0) {
+          const ok = await buyEnergy(GAME_TYPE_KNOCKOUT);
+          if (!ok) {
+            return { ok: false, error: 'Failed to buy energy. Please try again.' };
+          }
+        }
+      }
+
       const match_results = Object.entries(picks)
         .map(([localId, winner_team_id]) => {
           const match_number = KNOCKOUT_ID_TO_MATCH_NUMBER[localId];
@@ -216,7 +265,7 @@ export function StandingsPage() {
         ? { ok: true }
         : { ok: false, error: result.error };
     },
-    [submitPrediction, hasKnockoutPrediction]
+    [submitPrediction, hasKnockoutPrediction, address, buyEnergy]
   );
 
   const buyErrorMsg =
@@ -254,18 +303,12 @@ export function StandingsPage() {
             icon={<ClipboardList className="h-6 w-6 text-accent-purple" />}
             title={hasGroupPrediction ? 'Update Your Standings' : 'Create Your Custom Standings'}
             description="Predict how each group will finish and compete with others!"
-            ctaLabel={
-              busy === 'group'
-                ? 'Working…'
-                : hasGroupPrediction
-                  ? 'Edit'
-                  : 'Create Now'
-            }
-            disabled={loading || !!error || groups.length === 0 || busy !== null}
+            ctaLabel={hasGroupPrediction ? 'Edit' : 'Create Now'}
+            disabled={loading || !!error || groups.length === 0}
             onCta={() => {
-              void ensureEnergyAndOpen(GAME_TYPE_GROUP, hasGroupPrediction, () => {
-                setGroupWizardOpen(true);
-              });
+              setActionError(null);
+              resetBuyError();
+              setGroupWizardOpen(true);
             }}
           />
           {loading && (
@@ -296,6 +339,7 @@ export function StandingsPage() {
             onClose={() => { setGroupWizardOpen(false); }}
             groups={groups}
             initialPicks={groupInitialPicks}
+            requiresPayment={groupRequiresPayment}
             onSubmit={handleGroupSubmit}
           />
         </>
@@ -310,9 +354,9 @@ export function StandingsPage() {
             ctaLabel="Start Bracket"
             disabled
             onCta={() => {
-              void ensureEnergyAndOpen(GAME_TYPE_KNOCKOUT, hasKnockoutPrediction, () => {
-                setKnockoutWizardOpen(true);
-              });
+              setActionError(null);
+              resetBuyError();
+              setKnockoutWizardOpen(true);
             }}
           />
           <KnockoutBracket picks={knockoutInitialPicks} />
@@ -320,6 +364,7 @@ export function StandingsPage() {
             open={knockoutWizardOpen}
             onClose={() => { setKnockoutWizardOpen(false); }}
             initialPicks={knockoutInitialPicks}
+            requiresPayment={knockoutRequiresPayment}
             onSubmit={handleKnockoutSubmit}
           />
         </>

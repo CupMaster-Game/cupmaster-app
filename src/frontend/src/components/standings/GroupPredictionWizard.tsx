@@ -17,6 +17,7 @@ interface GroupPredictionWizardProps {
   onClose: () => void;
   groups: readonly WizardGroup[];
   initialPicks?: GroupPicks;
+  requiresPayment?: boolean;
   onSubmit: (picks: GroupPicks) => Promise<{ ok: boolean; error?: string }>;
 }
 
@@ -25,6 +26,7 @@ export function GroupPredictionWizard({
   onClose,
   groups,
   initialPicks,
+  requiresPayment,
   onSubmit,
 }: GroupPredictionWizardProps) {
   const [stepIdx, setStepIdx] = useState(0);
@@ -126,7 +128,9 @@ export function GroupPredictionWizard({
             {submitting
               ? 'Submitting…'
               : stepIdx === totalSteps - 1
-                ? 'Finish'
+                ? requiresPayment
+                  ? 'Finish (0.05$)'
+                  : 'Finish'
                 : 'Next'}
           </Button>
         </>
