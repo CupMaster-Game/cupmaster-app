@@ -15,7 +15,7 @@ const FEATURES: readonly Feature[] = [
     icon: CalendarDays,
     title: 'Fixture & Predictions',
     description:
-      'Browse the FIFA World Cup 2026 schedule and submit predictions for upcoming matches. Lock in your score before kickoff to earn points.',
+      'Browse the FIFA World Cup 2026 schedule and submit predictions for upcoming matches. Lock in your prediction before kickoff to earn points.',
   },
   {
     icon: BarChart3,
@@ -26,14 +26,13 @@ const FEATURES: readonly Feature[] = [
   {
     icon: Gamepad2,
     title: 'Mini Games',
-    description:
-      'Play Football Trivia, Guess the Player, and Match the Flag to earn extra points. Each game uses energy that you can top up on-chain.',
+    description: 'Play Football Trivia, Guess the Player, and Match the Flag to earn extra points.',
   },
   {
     icon: Trophy,
     title: 'Leaderboard & Rewards',
     description:
-      'Climb the global leaderboard with predictions and game scores. Top players win on-chain rewards at the end of the tournament.',
+      'Climb the global leaderboard with predictions and game scores. Top players win rewards at the end of the tournament.',
   },
 ];
 
@@ -67,7 +66,7 @@ export function HelpPage() {
           <h1 className="mt-1 text-xl font-extrabold tracking-tight">How CupMaster works</h1>
           <p className="mt-2 text-sm leading-relaxed text-text-secondary">
             CupMaster is a game about the FIFA World Cup and general football. Predict match
-            results, play mini games, and climb the leaderboard to earn on-chain rewards.
+            results, play mini games, and climb the leaderboard to earn rewards.
           </p>
 
           <section className="mt-6 space-y-3">
