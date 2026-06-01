@@ -437,10 +437,8 @@ export async function endGamePlay(gamePlayId: string, userId: string): Promise<E
     await tx`
       UPDATE user_numbers
       SET    total_score = total_score + ${score}
-      FROM   game_plays gp
-      WHERE  user_numbers.user_id = ${userId}
-        AND  gp.game_play_id = ${gamePlayId}
-        AND  gp.game_type = ${gameType}
+      WHERE  user_id = ${userId}
+        AND  game_type = ${gameType}
     `;
 
     return inserted[0] ?? null;
