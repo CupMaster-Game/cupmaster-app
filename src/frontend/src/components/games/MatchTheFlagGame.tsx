@@ -252,7 +252,7 @@ export function MatchTheFlagGame({ open, onClose }: MatchTheFlagGameProps) {
 
   if (phase === 'loading') {
     return (
-      <Modal open={open} onClose={close} title="Match the Flag">
+      <Modal dismissOnBackdrop={false} open={open} onClose={close} title="Match the Flag">
         <p className="py-6 text-center text-sm text-text-muted">Loading deck…</p>
       </Modal>
     );
@@ -260,7 +260,7 @@ export function MatchTheFlagGame({ open, onClose }: MatchTheFlagGameProps) {
 
   if (phase === 'ending') {
     return (
-      <Modal open={open} onClose={close} title="Match the Flag">
+      <Modal dismissOnBackdrop={false} open={open} onClose={close} title="Match the Flag">
         <p className="py-6 text-center text-sm text-text-muted">Scoring your matches…</p>
       </Modal>
     );
@@ -268,7 +268,7 @@ export function MatchTheFlagGame({ open, onClose }: MatchTheFlagGameProps) {
 
   if (phase === 'error') {
     return (
-      <Modal open={open} onClose={close} title="Match the Flag">
+      <Modal dismissOnBackdrop={false} open={open} onClose={close} title="Match the Flag">
         <div className="space-y-4 py-2 text-center">
           <p className="text-sm text-accent-red">{errorMsg ?? 'Something went wrong.'}</p>
           <Button fullWidth onClick={close}>
@@ -282,7 +282,7 @@ export function MatchTheFlagGame({ open, onClose }: MatchTheFlagGameProps) {
   if (phase === 'done') {
     const score = finalScore ?? 0;
     return (
-      <Modal open={open} onClose={close} title="Round Complete!">
+      <Modal dismissOnBackdrop={false} open={open} onClose={close} title="Round Complete!">
         <div className="space-y-4 text-center">
           <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-accent-orange/15">
             <Trophy className="h-8 w-8 text-accent-orange" />
@@ -302,7 +302,7 @@ export function MatchTheFlagGame({ open, onClose }: MatchTheFlagGameProps) {
     const pairsFound = matched.size / 2;
     const label = level ? level.label : 'Level';
     return (
-      <Modal open={open} onClose={close} title={`${label} Complete!`}>
+      <Modal dismissOnBackdrop={false} open={open} onClose={close} title={`${label} Complete!`}>
         <div className="space-y-4 text-center">
           <p className="text-sm text-text-muted">
             You matched {pairsFound} of {totalPairs} pairs.
@@ -319,7 +319,7 @@ export function MatchTheFlagGame({ open, onClose }: MatchTheFlagGameProps) {
   if (!level || !deck) return null;
 
   return (
-    <Modal open={open} onClose={close} title="Match the Flag">
+    <Modal dismissOnBackdrop={false} open={open} onClose={close} title="Match the Flag">
       <div className="space-y-4">
         <div className="flex items-center justify-between text-xs text-text-muted">
           <span>

@@ -196,7 +196,7 @@ export function TriviaGame({ open, onClose }: TriviaGameProps) {
 
   if (phase === 'loading') {
     return (
-      <Modal open={open} onClose={close} title="Football Trivia">
+      <Modal dismissOnBackdrop={false} open={open} onClose={close} title="Football Trivia">
         <p className="py-6 text-center text-sm text-text-muted">Loading questions…</p>
       </Modal>
     );
@@ -204,7 +204,7 @@ export function TriviaGame({ open, onClose }: TriviaGameProps) {
 
   if (phase === 'ending') {
     return (
-      <Modal open={open} onClose={close} title="Football Trivia">
+      <Modal dismissOnBackdrop={false} open={open} onClose={close} title="Football Trivia">
         <p className="py-6 text-center text-sm text-text-muted">Scoring your answers…</p>
       </Modal>
     );
@@ -212,7 +212,7 @@ export function TriviaGame({ open, onClose }: TriviaGameProps) {
 
   if (phase === 'error') {
     return (
-      <Modal open={open} onClose={close} title="Football Trivia">
+      <Modal dismissOnBackdrop={false} open={open} onClose={close} title="Football Trivia">
         <div className="space-y-4 py-2 text-center">
           <p className="text-sm text-accent-red">{errorMsg ?? 'Something went wrong.'}</p>
           <Button fullWidth onClick={close}>
@@ -226,7 +226,7 @@ export function TriviaGame({ open, onClose }: TriviaGameProps) {
   if (phase === 'done') {
     const score = finalScore ?? 0;
     return (
-      <Modal open={open} onClose={close} title="Round Complete!">
+      <Modal dismissOnBackdrop={false} open={open} onClose={close} title="Round Complete!">
         <div className="space-y-4 text-center">
           <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-accent-gold/15">
             <Trophy className="h-8 w-8 text-accent-gold" />
@@ -251,15 +251,12 @@ export function TriviaGame({ open, onClose }: TriviaGameProps) {
   ];
 
   return (
-    <Modal open={open} onClose={close} title="Football Trivia">
+    <Modal dismissOnBackdrop={false} open={open} onClose={close} title="Football Trivia">
       <div className="space-y-4">
         <div>
           <div className="mb-2 flex items-center justify-between text-xs text-text-muted">
             <span>
               Question {idx + 1} of {total}
-            </span>
-            <span>
-              {q.category} · {q.difficulty}
             </span>
           </div>
           <div className="h-1.5 w-full overflow-hidden rounded-full bg-bg-elevated">

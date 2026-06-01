@@ -10,6 +10,7 @@ interface ModalProps {
   footer?: ReactNode;
   className?: string;
   hideClose?: boolean;
+  dismissOnBackdrop?: boolean;
 }
 
 export function Modal({
@@ -20,6 +21,7 @@ export function Modal({
   footer,
   className,
   hideClose = false,
+  dismissOnBackdrop = true,
 }: ModalProps) {
   useEffect(() => {
     if (!open) return;
@@ -35,7 +37,7 @@ export function Modal({
   return (
     <div
       className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 backdrop-blur-sm animate-fade-in sm:items-center"
-      onClick={onClose}
+      onClick={dismissOnBackdrop ? onClose : undefined}
       role="dialog"
       aria-modal="true"
     >
