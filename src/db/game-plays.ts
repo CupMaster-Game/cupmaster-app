@@ -95,13 +95,11 @@ export async function insertGameAction(
   actionType: string,
   intval: number | null,
   textval: string | null,
-  extraData: unknown
+  extraData: Record<string, unknown> | null | undefined
 ): Promise<void> {
-  const extraJson =
-    extraData === null || extraData === undefined ? null : JSON.stringify(extraData);
   await tx`
     INSERT INTO game_actions (game_play_id, action_time, action_type, intval, textval, extra_data)
-    VALUES (${gamePlayId}, now(), ${actionType}, ${intval}, ${textval}, ${extraJson}::jsonb)
+    VALUES (${gamePlayId}, now(), ${actionType}, ${intval}, ${textval}, ${tx.json((extraData ?? null) as postgres.JSONValue)})
   `;
 }
 
@@ -477,7 +475,7 @@ export function bufferIngameAction(
   actionType: string,
   intval: number | null,
   textval: string | null,
-  extraData: unknown
+  extraData: Record<string, unknown> | null | undefined
 ): { action_time: Date } {
   const action_time = new Date();
   ingameActionBuffer.push({
@@ -486,8 +484,7 @@ export function bufferIngameAction(
     action_type: actionType,
     intval,
     textval,
-    extra_data_json:
-      extraData === null || extraData === undefined ? null : JSON.stringify(extraData),
+    extra_data_json: extraData == null ? null : JSON.stringify(extraData),
   });
   return { action_time };
 }
@@ -512,7 +509,7 @@ async function doFlushIngameActions(): Promise<void> {
                ${batch.map((e) => e.action_type)}::text[],
                ${batch.map((e) => e.intval)}::int[],
                ${batch.map((e) => e.textval)}::text[],
-               ${batch.map((e) => e.extra_data_json)}::text[]
+               ${batch.map((e) => e.extra_data_json)}::jsonb[]
              ) AS t(game_play_id, action_time, action_type, intval, textval, extra_data)
       WHERE  EXISTS (
                SELECT 1 FROM game_plays gp

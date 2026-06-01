@@ -3,9 +3,9 @@ import { Hono } from 'hono';
 import { validator } from 'hono/validator';
 import { z } from 'zod';
 import {
+  bufferIngameAction,
   buildGuessThePlayerStart,
   buildMatchTheFlagStart,
-  bufferIngameAction,
   createGamePlay,
   endGamePlay,
   getActiveTournament,
@@ -192,7 +192,7 @@ export const gameRoutes = new Hono<AuthEnv>()
           action_type: z.string().min(1).max(64),
           intval: z.number().int().nullish(),
           textval: z.string().max(1024).nullish(),
-          extra_data: z.unknown().nullish(),
+          extra_data: z.record(z.string(), z.unknown()).nullish(),
         })
         .safeParse(value);
       if (!result.success) {
