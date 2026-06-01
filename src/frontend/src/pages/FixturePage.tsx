@@ -18,7 +18,12 @@ import type { ApiFixture, MatchOutcome, MatchPrediction } from '@/types';
 
 export function FixturePage() {
   const today = useMemo(() => startOfDay(new Date()), []);
-  const [selected, setSelected] = useState<Date>(today);
+  // Before the World Cup kicks off, default the view to opening day so the
+  // user lands on the first match instead of an empty pre-tournament day.
+  const TOURNAMENT_START = useMemo(() => new Date(2026, 5, 11), []);
+  const [selected, setSelected] = useState<Date>(
+    today < TOURNAMENT_START ? TOURNAMENT_START : today
+  );
   const [fixtures, setFixtures] = useState<ApiFixture[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
