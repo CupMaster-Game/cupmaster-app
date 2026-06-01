@@ -67,11 +67,8 @@ export async function fetchOverallLeaderboard(): Promise<LeaderboardEntry[]> {
 // global_rank without a second query.
 export const getCachedLeaderboards = makeSmartCached(
   async () => {
-    const [active, overall] = await Promise.all([
-      fetchActiveLeaderboard(),
-      fetchOverallLeaderboard(),
-    ]);
-    return { active, overall };
+    const leaderboard = await fetchOverallLeaderboard();
+    return { active: leaderboard, overall: leaderboard };
   },
   { cacheSeconds: 10, autoRefresh: true, fileBackupName: 'leaderboard' }
 );
