@@ -1,4 +1,3 @@
-import { ChevronRight } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { truncateTeamName } from '@/lib/team';
 
@@ -50,13 +49,13 @@ export function GroupTable({ group, teams }: GroupTableProps) {
           </div>
         ))}
       </div>
-      <button
+      {/* </><button
         type="button"
         className="flex w-full items-center justify-center gap-1 border-t border-border-subtle py-2.5 text-xs font-semibold text-brand-400 hover:bg-bg-elevated"
       >
         View Group Details
         <ChevronRight className="h-3.5 w-3.5" />
-      </button>
+      </button> */}
     </Card>
   );
 }
