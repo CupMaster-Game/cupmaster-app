@@ -1,10 +1,17 @@
+import { createGamePlay, getActiveTournament, insertGameAction } from './game-plays.ts';
 import { sql, withTransaction } from './index.ts';
-import { createGamePlay, insertGameAction, getActiveTournament } from './game-plays.ts';
 
 // Game type IDs for predictions
 const GAME_TYPE_MATCH_PREDICTION = 201 as const;
 const GAME_TYPE_GROUP_PREDICTION = 202 as const;
 const GAME_TYPE_KNOCKOUT_PREDICTION = 203 as const;
+
+// Points awarded on submit for each prediction type.
+const POINTS_BY_GAME_TYPE: Record<201 | 202 | 203, number> = {
+  [GAME_TYPE_MATCH_PREDICTION]: 10,
+  [GAME_TYPE_GROUP_PREDICTION]: 350,
+  [GAME_TYPE_KNOCKOUT_PREDICTION]: 350,
+};
 
 export type MatchOutcome = 'team1' | 'team2' | 'draw';
 
@@ -104,8 +111,7 @@ export async function submitPrediction(
   ipAddress: string | null
 ): Promise<SubmitPredictionOutcome> {
   const gameType = gameTypeFor(payload);
-  const matchNumber =
-    payload.type === 'match_prediction' ? payload.data.match_number : null;
+  const matchNumber = payload.type === 'match_prediction' ? payload.data.match_number : null;
 
   const existing = await findExistingPredictionGamePlay(userId, gameType, matchNumber);
   if (existing !== null) {
@@ -113,6 +119,8 @@ export async function submitPrediction(
   }
 
   const tournamentId = await getActiveTournament();
+
+  const points = POINTS_BY_GAME_TYPE[gameType];
 
   const result = await withTransaction(async (tx) => {
     const created = await createGamePlay(tx, userId, gameType, tournamentId, ipAddress);
@@ -126,6 +134,13 @@ export async function submitPrediction(
       null,
       payload.data as unknown as Record<string, unknown>
     );
+
+    await tx`
+      UPDATE user_numbers
+      SET    total_score = total_score + ${points}
+      WHERE  user_id   = ${userId}
+        AND  game_type = ${gameType}
+    `;
 
     return created;
   });
@@ -147,8 +162,7 @@ export async function submitPredictionChange(
   payload: PredictionPayload
 ): Promise<SubmitPredictionOutcome> {
   const gameType = gameTypeFor(payload);
-  const matchNumber =
-    payload.type === 'match_prediction' ? payload.data.match_number : null;
+  const matchNumber = payload.type === 'match_prediction' ? payload.data.match_number : null;
 
   const gamePlayId = await findExistingPredictionGamePlay(userId, gameType, matchNumber);
   if (gamePlayId === null) {
@@ -204,9 +218,7 @@ export async function getUserPredictions(userId: string): Promise<UserPrediction
     ORDER BY ga.intval, ga.game_action_id DESC
   `;
 
-  const groupRows = await sql<
-    { extra_data: { standings: GroupStanding[] }; action_time: Date }[]
-  >`
+  const groupRows = await sql<{ extra_data: { standings: GroupStanding[] }; action_time: Date }[]>`
     SELECT ga.extra_data, ga.action_time
     FROM   game_plays gp
     JOIN   game_actions ga ON ga.game_play_id = gp.game_play_id
