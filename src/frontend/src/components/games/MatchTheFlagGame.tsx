@@ -34,9 +34,9 @@ interface LevelConfig {
 }
 
 const LEVELS: readonly LevelConfig[] = [
-  { cols: 3, rows: 4, seconds: 15, key: 'level1', label: 'Level 1' },
-  { cols: 4, rows: 4, seconds: 25, key: 'level2', label: 'Level 2' },
-  { cols: 4, rows: 6, seconds: 60, key: 'level3', label: 'Level 3' },
+  { cols: 3, rows: 4, seconds: 30, key: 'level1', label: 'Level 1' },
+  { cols: 4, rows: 4, seconds: 40, key: 'level2', label: 'Level 2' },
+  { cols: 4, rows: 5, seconds: 60, key: 'level3', label: 'Level 3' },
 ];
 const FIRST_LEVEL: LevelConfig = LEVELS[0] ?? {
   cols: 3,
@@ -368,7 +368,12 @@ export function MatchTheFlagGame({ open, onClose }: MatchTheFlagGameProps) {
                     className="h-3/4 w-3/4 object-contain"
                   />
                 ) : (
-                  <span className="text-base font-bold text-text-muted">?</span>
+                  <img
+                    src="/assets/brand/logo-icon.png"
+                    alt=""
+                    aria-hidden
+                    className="h-1/2 w-1/2 object-contain opacity-25"
+                  />
                 )}
               </button>
             );

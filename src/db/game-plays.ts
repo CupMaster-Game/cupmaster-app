@@ -4,9 +4,9 @@ import { sql, withTransaction } from './index.ts';
 
 // Match-the-Flag deck sizes. Each level uses N unique team flags, with every
 // flag appearing twice in the shuffled deck, so the deck has 2*N entries.
-export const MATCH_THE_FLAG_PAIRS_PER_LEVEL = [6, 8, 12] as const;
+export const MATCH_THE_FLAG_PAIRS_PER_LEVEL = [6, 8, 10] as const;
 const MATCH_THE_FLAG_MAX_PAIRS = Math.max(...MATCH_THE_FLAG_PAIRS_PER_LEVEL);
-const MATCH_THE_FLAG_POINTS_PER_PAIR = 2;
+const MATCH_THE_FLAG_POINTS_BY_LEVEL: Record<number, number> = { 1: 2, 2: 4, 3: 6 };
 
 type Sql = postgres.Sql | postgres.ReservedSql | postgres.TransactionSql;
 
@@ -151,7 +151,7 @@ export interface MatchTheFlagTeam {
   logo: string;
 }
 
-export interface MatchTheFlagDeck {
+interface MatchTheFlagDeck extends Record<string, unknown> {
   level1: string[];
   level2: string[];
   level3: string[];
@@ -274,65 +274,67 @@ async function computeTriviaScore(gamePlayId: string): Promise<number> {
 }
 
 /**
- * Computes a Match-the-Flag game's final score: 2 points per validly matched
- * pair across all 3 levels. A "valid" match is a flag_match action whose two
- * indexes point at the same team_id within the level's deck stored in the
- * selected_flags action. Duplicate (same-pair) match actions are deduped so
- * they only score once.
+ * Computes a Match-the-Flag game's final score. A "valid" match is a
+ * flag_match action whose two indexes point at the same team_id within the
+ * level's deck stored in the selected_flags action. Points per match vary
+ * by level (see MATCH_THE_FLAG_POINTS_BY_LEVEL).
  */
 async function computeMatchTheFlagScore(gamePlayId: string): Promise<number> {
   const rows = await sql<{ action_type: string; extra_data: unknown }[]>`
-    SELECT action_type, extra_data
-    FROM   game_actions
-    WHERE  game_play_id = ${gamePlayId}
-      AND  action_type IN ('selected_flags', 'flag_match')
-    ORDER BY game_action_id ASC
+    (
+      SELECT 'selected_flags'::text AS action_type, extra_data
+      FROM   game_actions
+      WHERE  game_play_id = ${gamePlayId}
+        AND  action_type = 'selected_flags'
+      ORDER BY game_action_id ASC
+      LIMIT  1
+    )
+    UNION ALL
+    (
+      SELECT 'flag_match'::text AS action_type, extra_data
+      FROM (
+        SELECT DISTINCT ON (level, idx_a, idx_b) extra_data
+        FROM (
+          SELECT extra_data,
+                 (extra_data->>'level')::int AS level,
+                 LEAST(
+                   (extra_data->'matching_indexes'->>0)::int,
+                   (extra_data->'matching_indexes'->>1)::int
+                 ) AS idx_a,
+                 GREATEST(
+                   (extra_data->'matching_indexes'->>0)::int,
+                   (extra_data->'matching_indexes'->>1)::int
+                 ) AS idx_b,
+                 game_action_id
+          FROM   game_actions
+          WHERE  game_play_id = ${gamePlayId}
+            AND  action_type = 'flag_match'
+        ) fm
+        ORDER BY level, idx_a, idx_b, game_action_id ASC
+      ) dedup
+    )
   `;
 
-  let decks: Record<string, unknown[]> | null = null;
-  // Dedupe matches by "level:minIdx:maxIdx" so the same pair only ever scores
-  // once even if the client somehow sent it twice.
-  const counted = new Set<string>();
-  let pairs = 0;
+  const deckRow = rows.find((r) => r.action_type === 'selected_flags');
+  if (!deckRow) return 0;
+  const decks = deckRow.extra_data as Record<string, unknown[]>;
 
+  let score = 0;
   for (const row of rows) {
-    if (row.action_type === 'selected_flags') {
-      if (decks !== null) continue; // use the first selected_flags row only
-      const data = row.extra_data;
-      if (data && typeof data === 'object') {
-        decks = data as Record<string, unknown[]>;
-      }
-      continue;
-    }
-    // flag_match
-    if (!decks) continue;
-    const data = row.extra_data;
-    if (!data || typeof data !== 'object') continue;
-    const { level, matching_indexes } = data as {
-      level?: unknown;
-      matching_indexes?: unknown;
+    if (row.action_type !== 'flag_match') continue;
+    const { level, matching_indexes } = row.extra_data as {
+      level: number;
+      matching_indexes: [number, number];
     };
-    if (typeof level !== 'number' || !Array.isArray(matching_indexes)) continue;
-    const indexes = matching_indexes as unknown[];
-    if (indexes.length < 2) continue;
-    const rawA = indexes[0];
-    const rawB = indexes[1];
-    if (typeof rawA !== 'number' || typeof rawB !== 'number') continue;
-    if (rawA === rawB) continue;
-    const idxA = Math.min(rawA, rawB);
-    const idxB = Math.max(rawA, rawB);
     const deck = decks['level' + level.toString()];
-    if (!Array.isArray(deck)) continue;
-    if (idxA < 0 || idxB >= deck.length) continue;
-    const key = level.toString() + ':' + idxA.toString() + ':' + idxB.toString();
-    if (counted.has(key)) continue;
-    counted.add(key);
+    if (!deck) continue;
+    const [idxA, idxB] = matching_indexes;
     if (deck[idxA] === deck[idxB]) {
-      pairs += 1;
+      score += MATCH_THE_FLAG_POINTS_BY_LEVEL[level] ?? 0;
     }
   }
 
-  return pairs * MATCH_THE_FLAG_POINTS_PER_PAIR;
+  return score;
 }
 
 /**
