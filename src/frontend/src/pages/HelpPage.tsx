@@ -132,6 +132,20 @@ export function HelpPage() {
               Contact support
             </a>
           </section>
+
+          <section className="mt-6">
+            <h2 className="border-b border-accent-yellow/30 pb-2 text-sm font-bold uppercase tracking-wide text-text-primary">
+              Legal
+            </h2>
+            <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-sm">
+              <Link to="/terms" className="font-semibold text-brand-300 hover:text-brand-200">
+                Terms of Service
+              </Link>
+              <Link to="/privacy" className="font-semibold text-brand-300 hover:text-brand-200">
+                Privacy Policy
+              </Link>
+            </div>
+          </section>
         </div>
       </main>
     </div>
