@@ -273,7 +273,7 @@ export async function renameUser(
 
     await tx`
       INSERT INTO user_mutable_data (user_id, name, flag, is_banned)
-      VALUES (${userId}, ${newName}, ${flag} ${isBanned})
+      VALUES (${userId}, ${newName}, ${flag}, ${isBanned})
     `;
 
     return { success: true };
