@@ -4,6 +4,7 @@ import {
   PROCESS_TOURNAMENT_INTERVAL_MS,
   runProcessTournamentJob,
 } from './jobs/process-tournament.ts';
+import { runSyncPurchasesJob, SYNC_PURCHASES_INTERVAL_MS } from './jobs/sync-purchases.ts';
 import { maintainAsyncJob } from './utils/index.ts';
 import { startWebServer } from './webserver/index.ts';
 
@@ -19,6 +20,11 @@ maintainAsyncJob(runProcessTournamentJob, PROCESS_TOURNAMENT_INTERVAL_MS).catch(
 
 maintainAsyncJob(runFetchFixturesJob, FETCH_FIXTURES_INTERVAL_MS).catch((err: unknown) => {
   console.error('Fetch fixtures job error:', err);
+  process.exit(1);
+});
+
+maintainAsyncJob(runSyncPurchasesJob, SYNC_PURCHASES_INTERVAL_MS).catch((err: unknown) => {
+  console.error('Sync purchases job error:', err);
   process.exit(1);
 });
 

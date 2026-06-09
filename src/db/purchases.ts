@@ -16,6 +16,18 @@ export async function findTransactionByHash(txHash: string): Promise<boolean> {
 }
 
 /**
+ * Returns the subset of the given tx hashes that already exist in
+ * user_transactions, as a Set. Done in a single query.
+ */
+export async function findExistingTxHashes(txHashes: string[]): Promise<Set<string>> {
+  if (txHashes.length === 0) return new Set();
+  const rows = await sql<{ tx_hash: string }[]>`
+    SELECT tx_hash FROM user_transactions WHERE tx_hash IN ${sql(txHashes)}
+  `;
+  return new Set(rows.map((r) => r.tx_hash));
+}
+
+/**
  * Processes a purchase transaction. Transactionally:
  * 1. Inserts into user_transactions
  * 2. If energy package (itemTypeId is a game type): inserts energy_issuance, increments user energy for the relevant game type
