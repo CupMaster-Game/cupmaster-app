@@ -1,14 +1,16 @@
-import { useCallback, useState } from 'react';
-import { UserRejectedRequestError } from 'viem';
-import { useAccount, usePublicClient, useWriteContract } from 'wagmi';
+import { getAuthedApi } from '@/lib/api';
 import cupmasterGameAbi from '@backend/abis/cupmaster-game.abi';
 import erc20Abi from '@backend/abis/erc20.abi';
+import { CUPMASTER_GAME_ADDRESS, PAYMENT_TOKENS, type GameTypeId } from '@backend/constants';
+import { useCallback, useState } from 'react';
 import {
-  CUPMASTER_GAME_ADDRESS,
-  PAYMENT_TOKENS,
-  type GameTypeId,
-} from '@backend/constants';
-import { getAuthedApi } from '@/lib/api';
+  TransactionNotFoundError,
+  TransactionReceiptNotFoundError,
+  UserRejectedRequestError,
+  type PublicClient,
+  type TransactionReceipt,
+} from 'viem';
+import { useAccount, usePublicClient, useWriteContract } from 'wagmi';
 
 // Mirrors the example app's flow: pick the user's best stablecoin balance as
 // the payment token, approve if needed, call buy(itemTypeId, paymentToken),
@@ -42,6 +44,26 @@ function get18DecimalsNormalized(amount: bigint, decimals: number): bigint {
   if (decimals === 18) return amount;
   if (decimals < 18) return amount * 10n ** BigInt(18 - decimals);
   return amount / 10n ** BigInt(decimals - 18);
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+async function waitForReceiptResilient(
+  client: PublicClient,
+  hash: `0x${string}`,
+  { timeoutMs = 60_000, pollMs = 1_500 }: { timeoutMs?: number; pollMs?: number } = {}
+): Promise<TransactionReceipt> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    try {
+      return await client.getTransactionReceipt({ hash });
+    } catch (err) {
+      const transient =
+        err instanceof TransactionReceiptNotFoundError || err instanceof TransactionNotFoundError;
+      if (!transient || Date.now() >= deadline) throw err;
+      await sleep(pollMs);
+    }
+  }
 }
 
 export function usePlayGame() {
@@ -137,10 +159,7 @@ export function usePlayGame() {
             args: [GAME_ADDRESS, approvalAmount],
           });
           setTxStatus('confirming');
-          const approveReceipt = await publicClient.waitForTransactionReceipt({
-            hash: approveTxHash,
-            confirmations: 1,
-          });
+          const approveReceipt = await waitForReceiptResilient(publicClient, approveTxHash);
           if (approveReceipt.status === 'reverted') {
             throw new Error('Approve transaction reverted');
           }
@@ -155,10 +174,7 @@ export function usePlayGame() {
           args: [BigInt(gameType), selectedAddr],
         });
         setTxStatus('confirming');
-        const buyReceipt = await publicClient.waitForTransactionReceipt({
-          hash: buyTxHash,
-          confirmations: 1,
-        });
+        const buyReceipt = await waitForReceiptResilient(publicClient, buyTxHash);
         if (buyReceipt.status === 'reverted') {
           throw new Error('Buy transaction reverted');
         }

@@ -1,6 +1,7 @@
 import { WagmiAdapter } from '@reown/appkit-adapter-wagmi';
 import { celo } from '@reown/appkit/networks';
 import { createAppKit } from '@reown/appkit/react';
+import { fallback, http } from 'viem';
 
 // TODO: replace with the CupMaster Reown project id before going to production.
 const projectId =
@@ -14,9 +15,20 @@ const metadata = {
   icons: ['/favicon.svg'],
 };
 
+const RPC_OPTS = { timeout: 3000, retryCount: 2, retryDelay: 300 } as const;
+const celoTransport = fallback([
+  http('https://rpc.ankr.com/celo', RPC_OPTS),
+  http('https://celo.drpc.org', RPC_OPTS),
+  http('https://forno.celo.org', RPC_OPTS),
+]);
+
 export const wagmiAdapter = new WagmiAdapter({
   projectId,
   networks: [celo],
+  transports: {
+    [celo.id]: celoTransport,
+  },
+  pollingInterval: 1000,
 });
 
 export const modal = createAppKit({
