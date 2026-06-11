@@ -102,30 +102,13 @@ async function fetchAllFixtures(): Promise<FixtureView[]> {
 
   return rows.map<FixtureView>((r) => {
     const isFinished = r.final_status_short !== null;
-    const isLive =
-      !isFinished && r.live_status_short !== null && r.live_status_short !== 'NS';
-    const status: FixtureStatus = isFinished
-      ? 'finished'
-      : isLive
-        ? 'live'
-        : 'scheduled';
+    const isLive = !isFinished && r.live_status_short !== null && r.live_status_short !== 'NS';
+    const status: FixtureStatus = isFinished ? 'finished' : isLive ? 'live' : 'scheduled';
 
-    const status_short = isFinished
-      ? r.final_status_short
-      : isLive
-        ? r.live_status_short
-        : null;
+    const status_short = isFinished ? r.final_status_short : isLive ? r.live_status_short : null;
 
-    const team1_score = isFinished
-      ? r.final_team1_score
-      : isLive
-        ? r.live_team1_score
-        : null;
-    const team2_score = isFinished
-      ? r.final_team2_score
-      : isLive
-        ? r.live_team2_score
-        : null;
+    const team1_score = isFinished ? r.final_team1_score : isLive ? r.live_team1_score : null;
+    const team2_score = isFinished ? r.final_team2_score : isLive ? r.live_team2_score : null;
 
     return {
       match_number: r.match_number,
@@ -161,3 +144,73 @@ export const getCachedFixtures = makeSmartCached(fetchAllFixtures, {
   cacheSeconds: 30,
   autoRefresh: true,
 });
+
+// ---------------------------------------------------------------------------
+// Live results ingestion (written by the fetch-live-results job)
+// ---------------------------------------------------------------------------
+
+export interface LiveCandidateFixture {
+  fixture_id: string;
+  api_fixture_id: number;
+}
+
+/**
+ * Fixtures whose kickoff falls within ±2h of now and which haven't been
+ * finalised yet. Used by the live-results job to decide whether any match is
+ * (about to be) live — an empty result means "nothing to poll, skip".
+ */
+export async function getLiveCandidateFixtures(): Promise<LiveCandidateFixture[]> {
+  return sql<LiveCandidateFixture[]>`
+    SELECT f.fixture_id, f.api_fixture_id
+    FROM   fixtures f
+    JOIN   match_schedules ms ON ms.match_number = f.match_number
+    WHERE  ms.match_time BETWEEN now() - interval '4 hours' AND now() + interval '4 hours'
+    AND    NOT EXISTS (SELECT 1 FROM fixture_results fr WHERE fr.fixture_id = f.fixture_id)
+  `;
+}
+
+/**
+ * Upserts the single live row for a fixture, but only writes when the
+ * (status, score) actually differs from what's stored — so unchanged polls are
+ * no-ops. Returns true if a row was inserted/updated.
+ */
+export async function upsertLiveResultIfChanged(
+  fixtureId: string,
+  statusShort: string,
+  team1Score: number,
+  team2Score: number
+): Promise<boolean> {
+  const rows = await sql`
+    INSERT INTO fixture_live_results (fixture_id, status_short, team1_score, team2_score, last_updated)
+    VALUES (${fixtureId}, ${statusShort}, ${team1Score}, ${team2Score}, now())
+    ON CONFLICT (fixture_id) DO UPDATE
+      SET status_short = EXCLUDED.status_short,
+          team1_score  = EXCLUDED.team1_score,
+          team2_score  = EXCLUDED.team2_score,
+          last_updated = EXCLUDED.last_updated
+      WHERE fixture_live_results.status_short IS DISTINCT FROM EXCLUDED.status_short
+         OR fixture_live_results.team1_score  IS DISTINCT FROM EXCLUDED.team1_score
+         OR fixture_live_results.team2_score  IS DISTINCT FROM EXCLUDED.team2_score
+    RETURNING fixture_id
+  `;
+  return rows.length > 0;
+}
+
+/**
+ * Records the final result for a completed fixture. No-op (returns false) if a
+ * result already exists — fixture_results is insert-only.
+ */
+export async function insertFixtureResultIfAbsent(
+  fixtureId: string,
+  statusShort: string,
+  team1Score: number,
+  team2Score: number
+): Promise<boolean> {
+  const rows = await sql`
+    INSERT INTO fixture_results (fixture_id, status_short, team1_score, team2_score)
+    VALUES (${fixtureId}, ${statusShort}, ${team1Score}, ${team2Score})
+    ON CONFLICT (fixture_id) DO NOTHING
+    RETURNING fixture_id
+  `;
+  return rows.length > 0;
+}

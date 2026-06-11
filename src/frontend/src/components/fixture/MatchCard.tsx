@@ -40,20 +40,51 @@ export function MatchCard({ fixture, prediction, onPredictClick }: MatchCardProp
   const team1Name = team1 ? truncateTeamName(team1.team_name) : 'TBD';
   const team2Name = team2 ? truncateTeamName(team2.team_name) : 'TBD';
   const statusLabel = fixture.status_short ?? (isLive ? 'LIVE' : 'FT');
+  // Team currently ahead — the winner once finished, the live leader otherwise.
+  // null on a draw (or before any score exists).
+  const leader: MatchOutcome | null =
+    (isFinished || isLive) && fixture.team1_score !== null && fixture.team2_score !== null
+      ? fixture.team1_score > fixture.team2_score
+        ? 'team1'
+        : fixture.team1_score < fixture.team2_score
+          ? 'team2'
+          : null
+      : null;
 
   return (
     <Card className="relative overflow-hidden">
       <span
         className={cn(
-          'absolute left-0 top-0 rounded-br-lg border-b border-r border-border-default bg-bg-elevated px-4 py-0.5 text-[11px] font-semibold',
-          isLive ? 'text-accent-red' : isFinished ? 'text-brand-400' : 'text-text-secondary'
+          'absolute left-0 top-0 rounded-br-lg border-b border-r border-border-default bg-bg-elevated px-4 py-0.5 text-[11px] font-semibold text-text-secondary'
         )}
       >
-        {isFinished || isLive ? statusLabel : formatTime(kickoff)}
+        {formatTime(kickoff)}
       </span>
+      {isLive && (
+        <span className="absolute right-0 top-0 flex items-center gap-1.5 rounded-bl-lg border-b border-l border-border-default bg-bg-elevated px-3 py-0.5 text-[11px] font-semibold text-accent-red">
+          <span className="relative flex h-2 w-2">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent-red opacity-75" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-accent-red" />
+          </span>
+          LIVE
+        </span>
+      )}
+      {isFinished && (
+        <span className="absolute right-0 top-0 flex items-center gap-1.5 rounded-bl-lg border-b border-l border-border-default bg-bg-elevated px-3 py-0.5 text-[11px] font-semibold text-brand-400">
+          FINISHED
+        </span>
+      )}
       <div className="flex items-center gap-3 px-1 pt-6">
         <div className="flex flex-1 items-center justify-end gap-2 text-right">
-          <span className="text-sm leading-tight">{team1Name}</span>
+          {leader === 'team1' && <Crown className="h-3.5 w-3.5 shrink-0 text-brand-400" />}
+          <span
+            className={cn(
+              'text-sm leading-tight',
+              leader === 'team1' && 'font-bold text-brand-300'
+            )}
+          >
+            {team1Name}
+          </span>
           <TeamLogo team={team1} />
         </div>
         <div className="flex w-16 flex-col items-center text-center">
@@ -73,7 +104,15 @@ export function MatchCard({ fixture, prediction, onPredictClick }: MatchCardProp
         </div>
         <div className="flex flex-1 items-center gap-2">
           <TeamLogo team={team2} />
-          <span className="text-sm leading-tight">{team2Name}</span>
+          <span
+            className={cn(
+              'text-sm leading-tight',
+              leader === 'team2' && 'font-bold text-brand-300'
+            )}
+          >
+            {team2Name}
+          </span>
+          {leader === 'team2' && <Crown className="h-3.5 w-3.5 shrink-0 text-brand-400" />}
         </div>
       </div>
 
