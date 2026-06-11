@@ -46,7 +46,8 @@ export type PredictionPayload =
 export type SubmitPredictionError =
   | 'duplicate_prediction'
   | 'not_enough_energy'
-  | 'no_existing_prediction';
+  | 'no_existing_prediction'
+  | 'match_started';
 
 export type SubmitPredictionOutcome =
   | { ok: true; game_play_id: string }
@@ -100,6 +101,21 @@ async function findExistingPredictionGamePlay(
 }
 
 /**
+ * Returns true once a match's scheduled kickoff time has passed. Predictions
+ * (and prediction changes) are locked from this point on. Unknown match numbers
+ * are treated as started (fail closed) so we never accept a prediction for a
+ * match we can't validate.
+ */
+async function hasMatchStarted(matchNumber: number): Promise<boolean> {
+  const rows = await sql<{ started: boolean }[]>`
+    SELECT match_time <= now() AS started
+    FROM   match_schedules
+    WHERE  match_number = ${matchNumber}
+  `;
+  return rows[0]?.started ?? true;
+}
+
+/**
  * Submits a prediction by creating a new game_play (decrements energy when
  * game_type has a non-zero energy cost) and inserting the submit_prediction
  * game_action atomically. Errors if a prediction already exists for the same
@@ -112,6 +128,10 @@ export async function submitPrediction(
 ): Promise<SubmitPredictionOutcome> {
   const gameType = gameTypeFor(payload);
   const matchNumber = payload.type === 'match_prediction' ? payload.data.match_number : null;
+
+  if (matchNumber !== null && (await hasMatchStarted(matchNumber))) {
+    return { ok: false, error: 'match_started' };
+  }
 
   const existing = await findExistingPredictionGamePlay(userId, gameType, matchNumber);
   if (existing !== null) {
@@ -163,6 +183,10 @@ export async function submitPredictionChange(
 ): Promise<SubmitPredictionOutcome> {
   const gameType = gameTypeFor(payload);
   const matchNumber = payload.type === 'match_prediction' ? payload.data.match_number : null;
+
+  if (matchNumber !== null && (await hasMatchStarted(matchNumber))) {
+    return { ok: false, error: 'match_started' };
+  }
 
   const gamePlayId = await findExistingPredictionGamePlay(userId, gameType, matchNumber);
   if (gamePlayId === null) {

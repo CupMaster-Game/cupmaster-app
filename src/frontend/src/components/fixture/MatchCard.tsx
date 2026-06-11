@@ -23,6 +23,9 @@ export function MatchCard({ fixture, prediction, onPredictClick }: MatchCardProp
   const kickoff = new Date(fixture.match_time);
   const isFinished = fixture.status === 'finished';
   const isLive = fixture.status === 'live';
+  // Lock predictions once kickoff has passed, even if the status hasn't yet
+  // flipped to live/finished. The backend enforces the same rule.
+  const hasStarted = isFinished || isLive || kickoff.getTime() <= Date.now();
   const actualOutcome: MatchOutcome | null =
     isFinished && fixture.team1_score !== null && fixture.team2_score !== null
       ? fixture.team1_score > fixture.team2_score
@@ -82,7 +85,7 @@ export function MatchCard({ fixture, prediction, onPredictClick }: MatchCardProp
           actual={actualOutcome === 'team1'}
           finished={isFinished}
           wasCorrect={prediction?.pick === 'team1' ? wasCorrect : null}
-          disabled={isFinished || isLive || !hasTeams || prediction?.pick === 'team1'}
+          disabled={hasStarted || !hasTeams || prediction?.pick === 'team1'}
           onClick={() => onPredictClick?.(fixture, 'team1')}
         />
         <PickButton
@@ -92,7 +95,7 @@ export function MatchCard({ fixture, prediction, onPredictClick }: MatchCardProp
           actual={actualOutcome === 'draw'}
           finished={isFinished}
           wasCorrect={prediction?.pick === 'draw' ? wasCorrect : null}
-          disabled={isFinished || isLive || !hasTeams || prediction?.pick === 'draw'}
+          disabled={hasStarted || !hasTeams || prediction?.pick === 'draw'}
           onClick={() => onPredictClick?.(fixture, 'draw')}
         />
         <PickButton
@@ -102,7 +105,7 @@ export function MatchCard({ fixture, prediction, onPredictClick }: MatchCardProp
           actual={actualOutcome === 'team2'}
           finished={isFinished}
           wasCorrect={prediction?.pick === 'team2' ? wasCorrect : null}
-          disabled={isFinished || isLive || !hasTeams || prediction?.pick === 'team2'}
+          disabled={hasStarted || !hasTeams || prediction?.pick === 'team2'}
           onClick={() => onPredictClick?.(fixture, 'team2')}
         />
       </div>

@@ -77,6 +77,8 @@ function mapSubmitError(outcome: SubmitPredictionOutcome, c: Context) {
       return c.json({ error: 'Not enough energy' }, 400);
     case 'no_existing_prediction':
       return c.json({ error: 'No existing prediction to update' }, 404);
+    case 'match_started':
+      return c.json({ error: 'Match has already started' }, 409);
   }
 }
 
