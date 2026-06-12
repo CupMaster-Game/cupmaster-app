@@ -8,6 +8,7 @@ import {
   PROCESS_TOURNAMENT_INTERVAL_MS,
   runProcessTournamentJob,
 } from './jobs/process-tournament.ts';
+import { FETCH_STANDINGS_INTERVAL_MS, runFetchStandingsJob } from './jobs/fetch-standings.ts';
 import { runSyncPurchasesJob, SYNC_PURCHASES_INTERVAL_MS } from './jobs/sync-purchases.ts';
 import { maintainAsyncJob } from './utils/index.ts';
 import { startWebServer } from './webserver/index.ts';
@@ -29,6 +30,11 @@ maintainAsyncJob(runFetchFixturesJob, FETCH_FIXTURES_INTERVAL_MS).catch((err: un
 
 maintainAsyncJob(runFetchLiveResultsJob, FETCH_LIVE_RESULTS_INTERVAL_MS).catch((err: unknown) => {
   console.error('Fetch live results job error:', err);
+  process.exit(1);
+});
+
+maintainAsyncJob(runFetchStandingsJob, FETCH_STANDINGS_INTERVAL_MS).catch((err: unknown) => {
+  console.error('Fetch standings job error:', err);
   process.exit(1);
 });
 

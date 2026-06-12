@@ -69,6 +69,24 @@ CREATE TABLE fixture_live_results (
     last_updated       TIMESTAMPTZ NOT NULL
 );
 
+-- Group-stage standings, one row per team, refreshed from the football API
+-- after matches finish (updateable) (recreateable summary → HOT-update friendly).
+-- group_name is not stored here; it is derived by joining teams. `rank` is the
+-- team's position within its group.
+CREATE TABLE team_standings (
+    team_id        BIGINT      PRIMARY KEY REFERENCES teams(team_id),
+    rank           INT         NOT NULL CHECK (rank > 0),
+    played         INT         NOT NULL DEFAULT 0 CHECK (played >= 0),
+    win            INT         NOT NULL DEFAULT 0 CHECK (win >= 0),
+    draw           INT         NOT NULL DEFAULT 0 CHECK (draw >= 0),
+    lose           INT         NOT NULL DEFAULT 0 CHECK (lose >= 0),
+    goals_for      INT         NOT NULL DEFAULT 0 CHECK (goals_for >= 0),
+    goals_against  INT         NOT NULL DEFAULT 0 CHECK (goals_against >= 0),
+    goals_diff     INT         NOT NULL DEFAULT 0,
+    points         INT         NOT NULL DEFAULT 0 CHECK (points >= 0),
+    last_updated   TIMESTAMPTZ NOT NULL
+) WITH (fillfactor = 80);
+
 -- tournaments (no-update)
 CREATE TABLE tournaments (
     tournament_id           BIGINT DEFAULT generate_id() PRIMARY KEY,

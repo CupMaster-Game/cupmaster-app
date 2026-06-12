@@ -29,6 +29,20 @@ interface ApiTeam {
   group_name: string;
 }
 
+interface ApiStanding {
+  team_id: string;
+  group_name: string;
+  rank: number;
+  played: number;
+  win: number;
+  draw: number;
+  lose: number;
+  goals_for: number;
+  goals_against: number;
+  goals_diff: number;
+  points: number;
+}
+
 type StandingsTab = 'groups' | 'knockout';
 
 function groupKeyFromName(groupName: string): string {
@@ -62,6 +76,7 @@ export function StandingsPage() {
   const [groupWizardOpen, setGroupWizardOpen] = useState(false);
   const [knockoutWizardOpen, setKnockoutWizardOpen] = useState(false);
   const [teams, setTeams] = useState<ApiTeam[]>([]);
+  const [standings, setStandings] = useState<ApiStanding[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -73,15 +88,22 @@ export function StandingsPage() {
 
   useEffect(() => {
     let cancelled = false;
-    api.teams
-      .$get()
-      .then(async (res) => {
+    Promise.all([
+      api.teams.$get().then(async (res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status.toString()}`);
         return res.json();
-      })
-      .then((data) => {
+      }),
+      // Standings are best-effort: an empty/failed result just leaves the
+      // tables at zero rather than blocking the page.
+      api.standings
+        .$get()
+        .then(async (res) => (res.ok ? res.json() : { standings: [] }))
+        .catch(() => ({ standings: [] as ApiStanding[] })),
+    ])
+      .then(([teamsData, standingsData]) => {
         if (cancelled) return;
-        setTeams(data.teams);
+        setTeams(teamsData.teams);
+        setStandings(standingsData.standings);
       })
       .catch((err: unknown) => {
         if (cancelled) return;
@@ -96,28 +118,55 @@ export function StandingsPage() {
     };
   }, []);
 
+  const standingByTeamId = useMemo(() => {
+    const m = new Map<string, ApiStanding>();
+    for (const s of standings) m.set(s.team_id, s);
+    return m;
+  }, [standings]);
+
   const groups = useMemo(() => {
-    const byGroup = new Map<string, GroupTableTeam[]>();
+    const byGroup = new Map<string, { team: GroupTableTeam; rank: number | null }[]>();
     for (const t of teams) {
       const key = groupKeyFromName(t.group_name);
+      const s = standingByTeamId.get(t.team_id);
       const list = byGroup.get(key) ?? [];
       list.push({
-        team_id: t.team_id,
-        team_name: t.team_name,
-        country_code: t.country_code,
-        logo: t.logo,
+        team: {
+          team_id: t.team_id,
+          team_name: t.team_name,
+          country_code: t.country_code,
+          logo: t.logo,
+          standing: s
+            ? {
+                played: s.played,
+                win: s.win,
+                draw: s.draw,
+                lose: s.lose,
+                goals_diff: s.goals_diff,
+                points: s.points,
+              }
+            : undefined,
+        },
+        rank: s ? s.rank : null,
       });
       byGroup.set(key, list);
     }
     return Array.from(byGroup.entries())
       .map(([groupName, list]) => ({
         groupName,
-        teams: [...list].sort((a, b) =>
-          a.team_name.localeCompare(b.team_name),
-        ),
+        // Order by standings rank when available; fall back to alphabetical
+        // for teams with no played matches yet.
+        teams: [...list]
+          .sort((a, b) => {
+            if (a.rank !== null && b.rank !== null) return a.rank - b.rank;
+            if (a.rank !== null) return -1;
+            if (b.rank !== null) return 1;
+            return a.team.team_name.localeCompare(b.team.team_name);
+          })
+          .map((e) => e.team),
       }))
       .sort((a, b) => a.groupName.localeCompare(b.groupName));
-  }, [teams]);
+  }, [teams, standingByTeamId]);
 
   const groupInitialPicks = useMemo<GroupPicks>(() => {
     if (!predictions.group_prediction) return {};
