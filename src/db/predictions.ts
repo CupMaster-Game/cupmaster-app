@@ -208,6 +208,85 @@ export async function submitPredictionChange(
 }
 
 // ---------------------------------------------------------------------------
+// Result processing (background job)
+// ---------------------------------------------------------------------------
+
+/**
+ * Resolves match predictions whose match has finished. For every match_prediction
+ * (game_type 201) game_play that has no result yet and whose predicted match now
+ * has a fixture_results row, this:
+ *   - derives the actual outcome (team1 / team2 / draw) from the final score,
+ *   - inserts a game_play_results row scoring 30 for a correct prediction, 0 otherwise,
+ *   - bumps the user's user_numbers.total_score by the awarded score.
+ *
+ * All of it runs in a single statement so the result insert and the score bump
+ * stay atomic, and the ON CONFLICT guard keeps re-runs idempotent. Returns the
+ * number of predictions newly resolved.
+ */
+export async function processFinishedMatchPredictions(): Promise<number> {
+  const rows = await sql<{ processed: number }[]>`
+    WITH finished AS (
+      -- Finished matches and their actual outcome.
+      SELECT f.match_number,
+             CASE
+               WHEN fr.team1_score > fr.team2_score THEN 'team1'
+               WHEN fr.team1_score < fr.team2_score THEN 'team2'
+               ELSE 'draw'
+             END AS actual
+      FROM   fixture_results fr
+      JOIN   fixtures f ON f.fixture_id = fr.fixture_id
+    ),
+    candidate AS (
+      SELECT DISTINCT ON (gp.game_play_id)
+             gp.game_play_id,
+             gp.user_id,
+             fin.actual,
+             ga.extra_data->>'result' AS predicted
+      FROM   finished fin
+      JOIN   game_actions ga
+             ON ga.intval = fin.match_number
+            AND ga.action_type = 'submit_prediction'
+      JOIN   game_plays gp
+             ON gp.game_play_id = ga.game_play_id
+            AND gp.game_type = ${GAME_TYPE_MATCH_PREDICTION}
+      WHERE  NOT EXISTS (
+               SELECT 1 FROM game_play_results r
+               WHERE  r.game_play_id = gp.game_play_id
+             )
+      ORDER BY gp.game_play_id, ga.game_action_id DESC
+    ),
+    scored AS (
+      SELECT game_play_id,
+             user_id,
+             CASE WHEN predicted = actual THEN 30 ELSE 0 END AS score
+      FROM   candidate
+    ),
+    inserted AS (
+      INSERT INTO game_play_results (game_play_id, score)
+      SELECT game_play_id, score FROM scored
+      ON CONFLICT (game_play_id) DO NOTHING
+      RETURNING game_play_id, score
+    ),
+    agg AS (
+      SELECT s.user_id, SUM(i.score)::bigint AS total
+      FROM   inserted i
+      JOIN   scored s ON s.game_play_id = i.game_play_id
+      GROUP BY s.user_id
+    ),
+    updated AS (
+      UPDATE user_numbers un
+      SET    total_score = total_score + agg.total
+      FROM   agg
+      WHERE  un.user_id = agg.user_id
+        AND  un.game_type = ${GAME_TYPE_MATCH_PREDICTION}
+      RETURNING un.user_id
+    )
+    SELECT count(*)::int AS processed FROM inserted
+  `;
+  return rows[0]?.processed ?? 0;
+}
+
+// ---------------------------------------------------------------------------
 // Read path
 // ---------------------------------------------------------------------------
 

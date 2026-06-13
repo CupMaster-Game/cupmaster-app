@@ -125,7 +125,7 @@ export function StandingsPage() {
   }, [standings]);
 
   const groups = useMemo(() => {
-    const byGroup = new Map<string, { team: GroupTableTeam; rank: number | null }[]>();
+    const byGroup = new Map<string, { team: GroupTableTeam; standing: ApiStanding | undefined }[]>();
     for (const t of teams) {
       const key = groupKeyFromName(t.group_name);
       const s = standingByTeamId.get(t.team_id);
@@ -147,20 +147,29 @@ export function StandingsPage() {
               }
             : undefined,
         },
-        rank: s ? s.rank : null,
+        standing: s,
       });
       byGroup.set(key, list);
     }
     return Array.from(byGroup.entries())
       .map(([groupName, list]) => ({
         groupName,
-        // Order by standings rank when available; fall back to alphabetical
-        // for teams with no played matches yet.
+        // Order by the football API rank. When ranks tie (or a team has no
+        // standing row yet) break the tie by points, then goal difference,
+        // then goals scored, and only fall back to alphabetical as a last
+        // resort. Teams with a standing always sort ahead of teams without.
         teams: [...list]
           .sort((a, b) => {
-            if (a.rank !== null && b.rank !== null) return a.rank - b.rank;
-            if (a.rank !== null) return -1;
-            if (b.rank !== null) return 1;
+            const sa = a.standing;
+            const sb = b.standing;
+            if (sa && !sb) return -1;
+            if (!sa && sb) return 1;
+            if (sa && sb) {
+              if (sa.rank !== sb.rank) return sa.rank - sb.rank;
+              if (sb.points !== sa.points) return sb.points - sa.points;
+              if (sb.goals_diff !== sa.goals_diff) return sb.goals_diff - sa.goals_diff;
+              if (sb.goals_for !== sa.goals_for) return sb.goals_for - sa.goals_for;
+            }
             return a.team.team_name.localeCompare(b.team.team_name);
           })
           .map((e) => e.team),

@@ -5,6 +5,10 @@ import {
   runFetchLiveResultsJob,
 } from './jobs/fetch-live-results.ts';
 import {
+  PROCESS_PREDICTIONS_INTERVAL_MS,
+  runProcessPredictionsJob,
+} from './jobs/process-predictions.ts';
+import {
   PROCESS_TOURNAMENT_INTERVAL_MS,
   runProcessTournamentJob,
 } from './jobs/process-tournament.ts';
@@ -37,6 +41,13 @@ maintainAsyncJob(runFetchStandingsJob, FETCH_STANDINGS_INTERVAL_MS).catch((err: 
   console.error('Fetch standings job error:', err);
   process.exit(1);
 });
+
+maintainAsyncJob(runProcessPredictionsJob, PROCESS_PREDICTIONS_INTERVAL_MS).catch(
+  (err: unknown) => {
+    console.error('Process predictions job error:', err);
+    process.exit(1);
+  }
+);
 
 maintainAsyncJob(runSyncPurchasesJob, SYNC_PURCHASES_INTERVAL_MS).catch((err: unknown) => {
   console.error('Sync purchases job error:', err);
