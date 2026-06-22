@@ -359,10 +359,10 @@ export function StandingsPage() {
         <>
           <PredictionPrompt
             icon={<ClipboardList className="h-6 w-6 text-accent-purple" />}
-            title={hasGroupPrediction ? 'Update Your Standings' : 'Create Your Custom Standings'}
+            title="Group Standings Predictions"
             description="Predict how each group will finish and compete with others!"
             ctaLabel={hasGroupPrediction ? 'Edit' : 'Create Now'}
-            disabled={loading || !!error || groups.length === 0}
+            closedMessage="Standings predictions are closed."
             onCta={() => {
               setActionError(null);
               resetBuyError();
@@ -438,6 +438,7 @@ function PredictionPrompt({
   ctaLabel,
   onCta,
   disabled,
+  closedMessage,
 }: {
   icon: React.ReactNode;
   title: string;
@@ -445,6 +446,9 @@ function PredictionPrompt({
   ctaLabel: string;
   onCta: () => void;
   disabled?: boolean;
+  // When set, predictions are closed: the CTA button is hidden and this
+  // warning is shown in its place.
+  closedMessage?: string;
 }) {
   return (
     <Card className="bg-card-gradient">
@@ -456,10 +460,17 @@ function PredictionPrompt({
           <h3 className="text-sm font-bold">{title}</h3>
           <p className="text-xs text-text-muted">{description}</p>
         </div>
-        <Button onClick={onCta} size="sm" disabled={disabled} className="shrink-0 whitespace-nowrap">
-          {ctaLabel}
-        </Button>
+        {!closedMessage && (
+          <Button onClick={onCta} size="sm" disabled={disabled} className="shrink-0 whitespace-nowrap">
+            {ctaLabel}
+          </Button>
+        )}
       </div>
+      {closedMessage && (
+        <div className="border-t border-accent-orange/30 bg-accent-orange/10 px-4 py-2.5 text-xs font-medium text-accent-orange">
+          {closedMessage}
+        </div>
+      )}
     </Card>
   );
 }

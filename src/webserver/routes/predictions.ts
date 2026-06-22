@@ -68,6 +68,15 @@ const predictionSchema = z.discriminatedUnion('type', [
   knockoutPredictionSchema,
 ]);
 
+// Group standings predictions are closed: reject create/update attempts even
+// if a client bypasses the (hidden) frontend control.
+function groupPredictionsClosed(payload: PredictionPayload, c: Context) {
+  if (payload.type === 'group_prediction') {
+    return c.json({ error: 'Group standings predictions are closed' }, 403);
+  }
+  return null;
+}
+
 function mapSubmitError(outcome: SubmitPredictionOutcome, c: Context) {
   if (outcome.ok) return null;
   switch (outcome.error) {
@@ -99,6 +108,9 @@ export const predictionsRoutes = new Hono<AuthEnv>()
       const { user_id } = c.var.user;
       const payload: PredictionPayload = c.req.valid('json');
 
+      const closed = groupPredictionsClosed(payload, c);
+      if (closed) return closed;
+
       const outcome = await submitPrediction(user_id, payload, getClientIp(c));
       const err = mapSubmitError(outcome, c);
       if (err) return err;
@@ -122,6 +134,9 @@ export const predictionsRoutes = new Hono<AuthEnv>()
     async (c) => {
       const { user_id } = c.var.user;
       const payload: PredictionPayload = c.req.valid('json');
+
+      const closed = groupPredictionsClosed(payload, c);
+      if (closed) return closed;
 
       const outcome = await submitPredictionChange(user_id, payload);
       const err = mapSubmitError(outcome, c);
