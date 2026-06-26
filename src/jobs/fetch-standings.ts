@@ -23,6 +23,7 @@ interface ApiStandingEntry {
   team: { id: number };
   points: number;
   goalsDiff: number;
+  group: string;
   all: {
     played: number;
     win: number;
@@ -74,6 +75,10 @@ export async function runFetchStandingsJob(): Promise<void> {
   let updated = 0;
   for (const group of groups) {
     for (const entry of group) {
+      if (entry.group.replace('Group ', '').length !== 1) {
+        console.log('invalid group name', entry);
+        continue;
+      }
       const teamId = teamIdByApiId.get(entry.team.id);
       if (!teamId) {
         console.warn(`fetch-standings: unknown api team id ${String(entry.team.id)}`);

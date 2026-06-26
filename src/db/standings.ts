@@ -95,15 +95,6 @@ export async function upsertTeamStandingIfChanged(s: StandingUpsert): Promise<bo
           goals_diff    = EXCLUDED.goals_diff,
           points        = EXCLUDED.points,
           last_updated  = EXCLUDED.last_updated
-      WHERE team_standings.rank          IS DISTINCT FROM EXCLUDED.rank
-         OR team_standings.played        IS DISTINCT FROM EXCLUDED.played
-         OR team_standings.win           IS DISTINCT FROM EXCLUDED.win
-         OR team_standings.draw          IS DISTINCT FROM EXCLUDED.draw
-         OR team_standings.lose          IS DISTINCT FROM EXCLUDED.lose
-         OR team_standings.goals_for     IS DISTINCT FROM EXCLUDED.goals_for
-         OR team_standings.goals_against IS DISTINCT FROM EXCLUDED.goals_against
-         OR team_standings.goals_diff    IS DISTINCT FROM EXCLUDED.goals_diff
-         OR team_standings.points        IS DISTINCT FROM EXCLUDED.points
     RETURNING team_id
   `;
   return rows.length > 0;
