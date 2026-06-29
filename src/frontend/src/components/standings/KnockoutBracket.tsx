@@ -1,6 +1,7 @@
 import { Card } from '@/components/ui/Card';
 import type { KnockoutMatch, KnockoutTeam } from '@/data/standings';
 import { cn } from '@/lib/cn';
+import { Crown } from 'lucide-react';
 
 const ROUND_LABEL: Record<KnockoutMatch['round'], string> = {
   r32: 'Round of 32',
@@ -11,25 +12,21 @@ const ROUND_LABEL: Record<KnockoutMatch['round'], string> = {
 };
 
 interface KnockoutBracketProps {
-  /** Bracket structure with the Round-of-32 slots resolved from live fixtures. */
+  /** Bracket structure with each round's slots resolved from live fixtures. */
   bracket: readonly KnockoutMatch[];
   /** Lookup of real team info by team_id, for rendering slots. */
   teamsById: ReadonlyMap<string, KnockoutTeam>;
-  /** Mapping from local match id (e.g. "k32-1") to predicted winner team_id. */
-  picks: Record<string, string>;
+  /** Actual winner team_id per match id, from finished fixtures. */
+  winners: Record<string, string>;
 }
 
-export function KnockoutBracket({ bracket, teamsById, picks }: KnockoutBracketProps) {
+export function KnockoutBracket({ bracket, teamsById, winners }: KnockoutBracketProps) {
   const rounds: KnockoutMatch['round'][] = ['r32', 'r16', 'qf', 'sf', 'final'];
 
-  function resolveTeam(matchId: string): string | null {
-    return picks[matchId] ?? null;
-  }
-
   function renderMatch(m: KnockoutMatch) {
-    const team1Id = m.team1Id ?? (m.team1FromMatchId ? resolveTeam(m.team1FromMatchId) : null);
-    const team2Id = m.team2Id ?? (m.team2FromMatchId ? resolveTeam(m.team2FromMatchId) : null);
-    const winnerId = picks[m.id] ?? null;
+    const team1Id = m.team1Id;
+    const team2Id = m.team2Id;
+    const winnerId = winners[m.id] ?? null;
 
     return (
       <div key={m.id} className="rounded-xl border border-border-subtle bg-bg-subtle p-2">
@@ -75,8 +72,8 @@ function BracketSlot({ team, isWinner }: { team: KnockoutTeam | null; isWinner: 
   return (
     <div
       className={cn(
-        'flex items-center gap-2 rounded-md px-1 py-1 text-xs transition-colors',
-        isWinner && 'bg-brand-500/15 font-semibold text-brand-300'
+        'flex items-center gap-2 rounded-md px-1.5 py-1 text-xs transition-colors',
+        isWinner && 'bg-brand-500/20 font-semibold text-brand-300'
       )}
     >
       <img
@@ -85,6 +82,7 @@ function BracketSlot({ team, isWinner }: { team: KnockoutTeam | null; isWinner: 
         className="h-4 w-4 shrink-0 object-contain"
       />
       <span className="truncate">{team.team_name}</span>
+      {isWinner && <Crown className="ml-auto h-3.5 w-3.5 shrink-0 text-accent-gold" />}
     </div>
   );
 }

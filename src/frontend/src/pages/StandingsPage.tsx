@@ -258,6 +258,53 @@ export function StandingsPage() {
     [knockoutBracket]
   );
 
+  // All knockout fixtures keyed by match number, for the read-only bracket
+  // display (which, unlike the wizard, shows the real draw + results).
+  const fixtureByMatchNumber = useMemo(() => {
+    const m = new Map<number, ApiFixture>();
+    for (const f of fixtures) m.set(f.match_number, f);
+    return m;
+  }, [fixtures]);
+
+  // Actual winners of finished knockout matches (real results, not the user's
+  // predictions), keyed by local bracket id. Penalty-shootout ties (equal
+  // stored scores) can't be resolved from the score alone, so they stay
+  // unmarked until the next round's fixture reveals who advanced.
+  const knockoutWinners = useMemo(() => {
+    const out: Record<string, string> = {};
+    for (const [localId, matchNumber] of Object.entries(KNOCKOUT_ID_TO_MATCH_NUMBER)) {
+      const fx = fixtureByMatchNumber.get(matchNumber);
+      if (
+        fx?.status === 'finished' &&
+        fx.team1 &&
+        fx.team2 &&
+        fx.team1_score !== null &&
+        fx.team2_score !== null &&
+        fx.team1_score !== fx.team2_score
+      ) {
+        out[localId] = fx.team1_score > fx.team2_score ? fx.team1.team_id : fx.team2.team_id;
+      }
+    }
+    return out;
+  }, [fixtureByMatchNumber]);
+
+  // Bracket used for the read-only display: every round's teams come from real
+  // fixtures, falling back to the actual winner of the feeding match so results
+  // propagate forward even before the next fixture's teams are published.
+  const knockoutDisplayBracket = useMemo<readonly KnockoutMatch[]>(() => {
+    return KNOCKOUT_BRACKET.map((m) => {
+      const matchNumber = KNOCKOUT_ID_TO_MATCH_NUMBER[m.id];
+      const fx = matchNumber === undefined ? undefined : fixtureByMatchNumber.get(matchNumber);
+      const team1Id =
+        fx?.team1?.team_id ??
+        (m.team1FromMatchId ? (knockoutWinners[m.team1FromMatchId] ?? null) : null);
+      const team2Id =
+        fx?.team2?.team_id ??
+        (m.team2FromMatchId ? (knockoutWinners[m.team2FromMatchId] ?? null) : null);
+      return { ...m, team1Id, team2Id };
+    });
+  }, [fixtureByMatchNumber, knockoutWinners]);
+
   const hasGroupPrediction = predictions.group_prediction !== null;
   const hasKnockoutPrediction = predictions.knockout_prediction !== null;
 
@@ -460,10 +507,14 @@ export function StandingsPage() {
               setKnockoutWizardOpen(true);
             }}
           />
-          {/* Show only the real bracket (Round-of-32 fixtures); the user's
-              predicted winners are intentionally not overlaid here since the
-              downstream rounds aren't real results. */}
-          <KnockoutBracket bracket={knockoutBracket} teamsById={teamsById} picks={{}} />
+          {/* Read-only bracket showing the real draw and actual winners (not
+              the user's predictions, which can't be presented as a real
+              bracket). */}
+          <KnockoutBracket
+            bracket={knockoutDisplayBracket}
+            teamsById={teamsById}
+            winners={knockoutWinners}
+          />
           <KnockoutPredictionWizard
             open={knockoutWizardOpen}
             onClose={() => {
