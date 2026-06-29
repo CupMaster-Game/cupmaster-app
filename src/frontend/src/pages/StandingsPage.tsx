@@ -1,24 +1,26 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ClipboardList, Table2, Trophy } from 'lucide-react';
-import { useAccount } from 'wagmi';
-import { PageHeader } from '@/components/ui/PageHeader';
-import { Tabs } from '@/components/ui/Tabs';
-import { Card } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
-import { GroupTable, type GroupTableTeam } from '@/components/standings/GroupTable';
 import {
   GroupPredictionWizard,
   GroupSummary,
   type GroupPicks,
 } from '@/components/standings/GroupPredictionWizard';
+import { GroupTable, type GroupTableTeam } from '@/components/standings/GroupTable';
 import { KnockoutBracket } from '@/components/standings/KnockoutBracket';
 import {
   KnockoutPredictionWizard,
   type KnockoutPicks,
 } from '@/components/standings/KnockoutPredictionWizard';
-import { api, getAuthedApi } from '@/lib/api';
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { Tabs } from '@/components/ui/Tabs';
+import { KNOCKOUT_BRACKET, type KnockoutMatch, type KnockoutTeam } from '@/data/standings';
 import { usePlayGame } from '@/hooks/usePlayGame';
 import { usePredictions } from '@/hooks/usePredictions';
+import { api, getAuthedApi } from '@/lib/api';
+import type { ApiFixture } from '@/types';
+import { Table2, Trophy } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useAccount } from 'wagmi';
 
 interface ApiTeam {
   team_id: string;
@@ -72,11 +74,12 @@ const GAME_TYPE_KNOCKOUT = 203 as const;
 
 export function StandingsPage() {
   const { address } = useAccount();
-  const [tab, setTab] = useState<StandingsTab>('groups');
+  const [tab, setTab] = useState<StandingsTab>('knockout');
   const [groupWizardOpen, setGroupWizardOpen] = useState(false);
   const [knockoutWizardOpen, setKnockoutWizardOpen] = useState(false);
   const [teams, setTeams] = useState<ApiTeam[]>([]);
   const [standings, setStandings] = useState<ApiStanding[]>([]);
+  const [fixtures, setFixtures] = useState<ApiFixture[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -99,11 +102,19 @@ export function StandingsPage() {
         .$get()
         .then(async (res) => (res.ok ? res.json() : { standings: [] }))
         .catch(() => ({ standings: [] as ApiStanding[] })),
+      // Fixtures drive the knockout bracket (Round-of-32 team pairings).
+      // Best-effort like standings: an empty result just leaves the bracket
+      // TBA until the knockout draw is known.
+      api.fixtures
+        .$get()
+        .then(async (res) => (res.ok ? res.json() : { fixtures: [] }))
+        .catch(() => ({ fixtures: [] as ApiFixture[] })),
     ])
-      .then(([teamsData, standingsData]) => {
+      .then(([teamsData, standingsData, fixturesData]) => {
         if (cancelled) return;
         setTeams(teamsData.teams);
         setStandings(standingsData.standings);
+        setFixtures(fixturesData.fixtures);
       })
       .catch((err: unknown) => {
         if (cancelled) return;
@@ -125,7 +136,10 @@ export function StandingsPage() {
   }, [standings]);
 
   const groups = useMemo(() => {
-    const byGroup = new Map<string, { team: GroupTableTeam; standing: ApiStanding | undefined }[]>();
+    const byGroup = new Map<
+      string,
+      { team: GroupTableTeam; standing: ApiStanding | undefined }[]
+    >();
     for (const t of teams) {
       const key = groupKeyFromName(t.group_name);
       const s = standingByTeamId.get(t.team_id);
@@ -195,6 +209,54 @@ export function StandingsPage() {
     }
     return out;
   }, [predictions.knockout_prediction]);
+
+  // Real team info keyed by team_id, used to render bracket slots.
+  const teamsById = useMemo(() => {
+    const m = new Map<string, KnockoutTeam>();
+    for (const t of teams) {
+      m.set(t.team_id, {
+        team_id: t.team_id,
+        team_name: t.team_name,
+        country_code: t.country_code,
+        logo: t.logo,
+      });
+    }
+    return m;
+  }, [teams]);
+
+  // Round-of-32 team pairings come from the live fixtures (match numbers
+  // 73-88). Later rounds stay TBA and are filled in from the user's own picks
+  // as they advance through the wizard.
+  const r32FixtureByMatchNumber = useMemo(() => {
+    const m = new Map<number, ApiFixture>();
+    for (const f of fixtures) {
+      if (f.match_number >= 73 && f.match_number <= 88) m.set(f.match_number, f);
+    }
+    return m;
+  }, [fixtures]);
+
+  const knockoutBracket = useMemo<readonly KnockoutMatch[]>(() => {
+    return KNOCKOUT_BRACKET.map((m) => {
+      if (m.round !== 'r32') return m;
+      const matchNumber = KNOCKOUT_ID_TO_MATCH_NUMBER[m.id];
+      const fx = matchNumber === undefined ? undefined : r32FixtureByMatchNumber.get(matchNumber);
+      return {
+        ...m,
+        team1Id: fx?.team1?.team_id ?? null,
+        team2Id: fx?.team2?.team_id ?? null,
+      };
+    });
+  }, [r32FixtureByMatchNumber]);
+
+  // The bracket can only be predicted once the knockout draw is set, i.e. every
+  // Round-of-32 match has both teams assigned.
+  const knockoutReady = useMemo(
+    () =>
+      knockoutBracket
+        .filter((m) => m.round === 'r32')
+        .every((m) => m.team1Id !== null && m.team2Id !== null),
+    [knockoutBracket]
+  );
 
   const hasGroupPrediction = predictions.group_prediction !== null;
   const hasKnockoutPrediction = predictions.knockout_prediction !== null;
@@ -280,9 +342,7 @@ export function StandingsPage() {
         { type: 'group_prediction', data: { standings } },
         hasGroupPrediction ? 'submitChange' : 'submit'
       );
-      return result.ok
-        ? { ok: true }
-        : { ok: false, error: result.error };
+      return result.ok ? { ok: true } : { ok: false, error: result.error };
     },
     [submitPrediction, hasGroupPrediction, address, buyEnergy]
   );
@@ -319,9 +379,7 @@ export function StandingsPage() {
         { type: 'knockout_bracket_prediction', data: { match_results } },
         hasKnockoutPrediction ? 'submitChange' : 'submit'
       );
-      return result.ok
-        ? { ok: true }
-        : { ok: false, error: result.error };
+      return result.ok ? { ok: true } : { ok: false, error: result.error };
     },
     [submitPrediction, hasKnockoutPrediction, address, buyEnergy]
   );
@@ -344,8 +402,8 @@ export function StandingsPage() {
         value={tab}
         onChange={setTab}
         options={[
-          { value: 'groups', label: 'Group Standings', icon: <Table2 className="h-4 w-4" /> },
           { value: 'knockout', label: 'Knockout Bracket', icon: <Trophy className="h-4 w-4" /> },
+          { value: 'groups', label: 'Group Standings', icon: <Table2 className="h-4 w-4" /> },
         ]}
       />
 
@@ -357,44 +415,27 @@ export function StandingsPage() {
 
       {tab === 'groups' && (
         <>
-          <PredictionPrompt
-            icon={<ClipboardList className="h-6 w-6 text-accent-purple" />}
-            title="Group Standings Predictions"
-            description="Predict how each group will finish and compete with others!"
-            ctaLabel={hasGroupPrediction ? 'Edit' : 'Create Now'}
-            closedMessage="Standings predictions are closed."
-            onCta={() => {
-              setActionError(null);
-              resetBuyError();
-              setGroupWizardOpen(true);
-            }}
-          />
           {loading && (
-            <Card className="px-4 py-6 text-center text-sm text-text-muted">
-              Loading teams…
-            </Card>
+            <Card className="px-4 py-6 text-center text-sm text-text-muted">Loading teams…</Card>
           )}
           {!loading && error && (
-            <Card className="px-4 py-6 text-center text-sm text-accent-red">
-              {error}
-            </Card>
+            <Card className="px-4 py-6 text-center text-sm text-accent-red">{error}</Card>
           )}
           {!loading && !error && (
             <div className="space-y-4">
               {groups.map(({ groupName, teams: groupTeams }) => (
                 <div key={groupName} className="space-y-2">
                   <GroupTable group={groupName} teams={groupTeams} />
-                  <GroupSummary
-                    teams={groupTeams}
-                    prediction={groupInitialPicks[groupName]}
-                  />
+                  <GroupSummary teams={groupTeams} prediction={groupInitialPicks[groupName]} />
                 </div>
               ))}
             </div>
           )}
           <GroupPredictionWizard
             open={groupWizardOpen}
-            onClose={() => { setGroupWizardOpen(false); }}
+            onClose={() => {
+              setGroupWizardOpen(false);
+            }}
             groups={groups}
             initialPicks={groupInitialPicks}
             requiresPayment={groupRequiresPayment}
@@ -409,18 +450,27 @@ export function StandingsPage() {
             icon={<Trophy className="h-6 w-6 text-accent-orange" />}
             title={hasKnockoutPrediction ? 'Update Your Bracket' : 'Predict the Knockout'}
             description="Pick winners round-by-round, all the way to the trophy."
-            ctaLabel="Start Bracket"
-            disabled
+            ctaLabel={hasKnockoutPrediction ? 'Edit Bracket' : 'Start Bracket'}
+            closedMessage={
+              knockoutReady ? undefined : 'Bracket predictions open once the Round of 32 is set.'
+            }
             onCta={() => {
               setActionError(null);
               resetBuyError();
               setKnockoutWizardOpen(true);
             }}
           />
-          <KnockoutBracket picks={knockoutInitialPicks} />
+          {/* Show only the real bracket (Round-of-32 fixtures); the user's
+              predicted winners are intentionally not overlaid here since the
+              downstream rounds aren't real results. */}
+          <KnockoutBracket bracket={knockoutBracket} teamsById={teamsById} picks={{}} />
           <KnockoutPredictionWizard
             open={knockoutWizardOpen}
-            onClose={() => { setKnockoutWizardOpen(false); }}
+            onClose={() => {
+              setKnockoutWizardOpen(false);
+            }}
+            bracket={knockoutBracket}
+            teamsById={teamsById}
             initialPicks={knockoutInitialPicks}
             requiresPayment={knockoutRequiresPayment}
             onSubmit={handleKnockoutSubmit}
@@ -461,7 +511,12 @@ function PredictionPrompt({
           <p className="text-xs text-text-muted">{description}</p>
         </div>
         {!closedMessage && (
-          <Button onClick={onCta} size="sm" disabled={disabled} className="shrink-0 whitespace-nowrap">
+          <Button
+            onClick={onCta}
+            size="sm"
+            disabled={disabled}
+            className="shrink-0 whitespace-nowrap"
+          >
             {ctaLabel}
           </Button>
         )}

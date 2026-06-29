@@ -1,7 +1,5 @@
 import { Card } from '@/components/ui/Card';
-import { Flag } from '@/components/ui/Flag';
-import { KNOCKOUT_BRACKET, type KnockoutMatch } from '@/data/standings';
-import { getTeam } from '@/data/teams';
+import type { KnockoutMatch, KnockoutTeam } from '@/data/standings';
 import { cn } from '@/lib/cn';
 
 const ROUND_LABEL: Record<KnockoutMatch['round'], string> = {
@@ -13,11 +11,15 @@ const ROUND_LABEL: Record<KnockoutMatch['round'], string> = {
 };
 
 interface KnockoutBracketProps {
+  /** Bracket structure with the Round-of-32 slots resolved from live fixtures. */
+  bracket: readonly KnockoutMatch[];
+  /** Lookup of real team info by team_id, for rendering slots. */
+  teamsById: ReadonlyMap<string, KnockoutTeam>;
   /** Mapping from local match id (e.g. "k32-1") to predicted winner team_id. */
   picks: Record<string, string>;
 }
 
-export function KnockoutBracket({ picks }: KnockoutBracketProps) {
+export function KnockoutBracket({ bracket, teamsById, picks }: KnockoutBracketProps) {
   const rounds: KnockoutMatch['round'][] = ['r32', 'r16', 'qf', 'sf', 'final'];
 
   function resolveTeam(matchId: string): string | null {
@@ -31,9 +33,15 @@ export function KnockoutBracket({ picks }: KnockoutBracketProps) {
 
     return (
       <div key={m.id} className="rounded-xl border border-border-subtle bg-bg-subtle p-2">
-        <BracketSlot teamId={team1Id} isWinner={winnerId !== null && winnerId === team1Id} />
+        <BracketSlot
+          team={team1Id ? (teamsById.get(team1Id) ?? null) : null}
+          isWinner={winnerId !== null && winnerId === team1Id}
+        />
         <div className="my-1 h-px bg-border-subtle" />
-        <BracketSlot teamId={team2Id} isWinner={winnerId !== null && winnerId === team2Id} />
+        <BracketSlot
+          team={team2Id ? (teamsById.get(team2Id) ?? null) : null}
+          isWinner={winnerId !== null && winnerId === team2Id}
+        />
       </div>
     );
   }
@@ -41,7 +49,7 @@ export function KnockoutBracket({ picks }: KnockoutBracketProps) {
   return (
     <div className="space-y-4">
       {rounds.map((round) => {
-        const matches = KNOCKOUT_BRACKET.filter((m) => m.round === round);
+        const matches = bracket.filter((m) => m.round === round);
         return (
           <Card key={round} className="overflow-hidden">
             <div className="border-b border-border-subtle px-4 py-2.5">
@@ -55,8 +63,8 @@ export function KnockoutBracket({ picks }: KnockoutBracketProps) {
   );
 }
 
-function BracketSlot({ teamId, isWinner }: { teamId: string | null; isWinner: boolean }) {
-  if (!teamId) {
+function BracketSlot({ team, isWinner }: { team: KnockoutTeam | null; isWinner: boolean }) {
+  if (!team) {
     return (
       <div className="flex items-center gap-2 px-1 py-1 text-xs text-text-faint">
         <span className="h-4 w-6 rounded bg-bg-elevated" />
@@ -64,7 +72,6 @@ function BracketSlot({ teamId, isWinner }: { teamId: string | null; isWinner: bo
       </div>
     );
   }
-  const team = getTeam(teamId);
   return (
     <div
       className={cn(
@@ -72,8 +79,12 @@ function BracketSlot({ teamId, isWinner }: { teamId: string | null; isWinner: bo
         isWinner && 'bg-brand-500/15 font-semibold text-brand-300'
       )}
     >
-      <Flag code={team.code} size="sm" />
-      <span className="truncate">{team.name}</span>
+      <img
+        src={`/assets/team-logos/${team.logo}`}
+        alt={team.team_name}
+        className="h-4 w-4 shrink-0 object-contain"
+      />
+      <span className="truncate">{team.team_name}</span>
     </div>
   );
 }
