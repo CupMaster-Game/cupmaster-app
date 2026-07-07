@@ -74,6 +74,9 @@ function groupPredictionsClosed(payload: PredictionPayload, c: Context) {
   if (payload.type === 'group_prediction') {
     return c.json({ error: 'Group standings predictions are closed' }, 403);
   }
+  if (payload.type === 'knockout_bracket_prediction') {
+    return c.json({ error: 'Knockout bracket predictions are closed' }, 403);
+  }
   return null;
 }
 

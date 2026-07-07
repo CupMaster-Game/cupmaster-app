@@ -500,20 +500,6 @@ export function StandingsPage() {
 
       {tab === 'knockout' && (
         <>
-          <PredictionPrompt
-            icon={<Trophy className="h-6 w-6 text-accent-orange" />}
-            title={hasKnockoutPrediction ? 'Update Your Bracket' : 'Predict the Knockout'}
-            description="Pick winners round-by-round, all the way to the trophy."
-            ctaLabel={hasKnockoutPrediction ? 'Edit Bracket' : 'Start Bracket'}
-            closedMessage={
-              knockoutReady ? undefined : 'Bracket predictions open once the Round of 32 is set.'
-            }
-            onCta={() => {
-              setActionError(null);
-              resetBuyError();
-              setKnockoutWizardOpen(true);
-            }}
-          />
           {/* Read-only bracket showing the real draw and actual winners (not
               the user's predictions, which can't be presented as a real
               bracket). */}
