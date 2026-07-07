@@ -14,7 +14,8 @@
     "lint:fix": "eslint src --fix",
     "format": "prettier --write \"src/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\"",
-    "generate:world-cup-data": "node --experimental-strip-types scripts/generate-world-cup-data.ts"
+    "generate:world-cup-data": "node --experimental-strip-types scripts/generate-world-cup-data.ts",
+    "backfill:penalties": "node --experimental-strip-types scripts/backfill-penalties.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
