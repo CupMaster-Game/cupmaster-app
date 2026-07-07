@@ -39,6 +39,10 @@ export interface ApiFixture {
   team2: ApiFixtureTeam | null;
   team1_score: number | null;
   team2_score: number | null;
+  // Penalty-shootout score, present only for knockout matches decided on
+  // penalties (status_short = 'PEN').
+  team1_penalty: number | null;
+  team2_penalty: number | null;
 }
 
 export interface GroupOrderPrediction {

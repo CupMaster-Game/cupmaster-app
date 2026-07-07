@@ -26,13 +26,21 @@ export function MatchCard({ fixture, prediction, onPredictClick }: MatchCardProp
   // Lock predictions once kickoff has passed, even if the status hasn't yet
   // flipped to live/finished. The backend enforces the same rule.
   const hasStarted = isFinished || isLive || kickoff.getTime() <= Date.now();
+  // Winner of a finished match. When regulation/extra-time is level, a penalty
+  // shootout (team{1,2}_penalty) decides it; a still-level match is a draw.
   const actualOutcome: MatchOutcome | null =
     isFinished && fixture.team1_score !== null && fixture.team2_score !== null
       ? fixture.team1_score > fixture.team2_score
         ? 'team1'
         : fixture.team1_score < fixture.team2_score
           ? 'team2'
-          : 'draw'
+          : fixture.team1_penalty !== null &&
+              fixture.team2_penalty !== null &&
+              fixture.team1_penalty !== fixture.team2_penalty
+            ? fixture.team1_penalty > fixture.team2_penalty
+              ? 'team1'
+              : 'team2'
+            : 'draw'
       : null;
   const wasCorrect = prediction && actualOutcome ? prediction.pick === actualOutcome : null;
   const group = fixtureGroup(fixture);
@@ -40,15 +48,21 @@ export function MatchCard({ fixture, prediction, onPredictClick }: MatchCardProp
   const team1Name = team1 ? truncateTeamName(team1.team_name) : 'TBD';
   const team2Name = team2 ? truncateTeamName(team2.team_name) : 'TBD';
   const statusLabel = fixture.status_short ?? (isLive ? 'LIVE' : 'FT');
-  // Team currently ahead — the winner once finished, the live leader otherwise.
-  // null on a draw (or before any score exists).
+  const hasPenalties =
+    isFinished && fixture.team1_penalty !== null && fixture.team2_penalty !== null;
+  // Team currently ahead — the winner once finished (including on penalties),
+  // the live leader otherwise. null on a draw (or before any score exists).
   const leader: MatchOutcome | null =
     (isFinished || isLive) && fixture.team1_score !== null && fixture.team2_score !== null
       ? fixture.team1_score > fixture.team2_score
         ? 'team1'
         : fixture.team1_score < fixture.team2_score
           ? 'team2'
-          : null
+          : isFinished
+            ? actualOutcome === 'draw'
+              ? null
+              : actualOutcome
+            : null
       : null;
 
   return (
@@ -101,6 +115,11 @@ export function MatchCard({ fixture, prediction, onPredictClick }: MatchCardProp
               ? `${fixture.team1_score ?? '-'} - ${fixture.team2_score ?? '-'}`
               : 'VS'}
           </span>
+          {hasPenalties && (
+            <span className="text-[10px] font-semibold text-text-muted">
+              (pens {fixture.team1_penalty} - {fixture.team2_penalty})
+            </span>
+          )}
         </div>
         <div className="flex flex-1 items-center gap-2">
           <TeamLogo team={team2} />

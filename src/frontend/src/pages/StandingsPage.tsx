@@ -267,22 +267,29 @@ export function StandingsPage() {
   }, [fixtures]);
 
   // Actual winners of finished knockout matches (real results, not the user's
-  // predictions), keyed by local bracket id. Penalty-shootout ties (equal
-  // stored scores) can't be resolved from the score alone, so they stay
-  // unmarked until the next round's fixture reveals who advanced.
+  // predictions), keyed by local bracket id. When regulation/extra-time is
+  // level the penalty shootout decides who advanced.
   const knockoutWinners = useMemo(() => {
     const out: Record<string, string> = {};
     for (const [localId, matchNumber] of Object.entries(KNOCKOUT_ID_TO_MATCH_NUMBER)) {
       const fx = fixtureByMatchNumber.get(matchNumber);
       if (
-        fx?.status === 'finished' &&
-        fx.team1 &&
-        fx.team2 &&
-        fx.team1_score !== null &&
-        fx.team2_score !== null &&
-        fx.team1_score !== fx.team2_score
+        fx?.status !== 'finished' ||
+        !fx.team1 ||
+        !fx.team2 ||
+        fx.team1_score === null ||
+        fx.team2_score === null
       ) {
+        continue;
+      }
+      if (fx.team1_score !== fx.team2_score) {
         out[localId] = fx.team1_score > fx.team2_score ? fx.team1.team_id : fx.team2.team_id;
+      } else if (
+        fx.team1_penalty !== null &&
+        fx.team2_penalty !== null &&
+        fx.team1_penalty !== fx.team2_penalty
+      ) {
+        out[localId] = fx.team1_penalty > fx.team2_penalty ? fx.team1.team_id : fx.team2.team_id;
       }
     }
     return out;

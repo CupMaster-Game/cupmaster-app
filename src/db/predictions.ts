@@ -226,11 +226,16 @@ export async function submitPredictionChange(
 export async function processFinishedMatchPredictions(): Promise<number> {
   const rows = await sql<{ processed: number }[]>`
     WITH finished AS (
-      -- Finished matches and their actual outcome.
+      -- Finished matches and their actual outcome. A knockout match level after
+      -- extra time is decided by its penalty shootout (team{1,2}_penalty).
       SELECT f.match_number,
              CASE
                WHEN fr.team1_score > fr.team2_score THEN 'team1'
                WHEN fr.team1_score < fr.team2_score THEN 'team2'
+               WHEN fr.team1_penalty IS NOT NULL AND fr.team2_penalty IS NOT NULL
+                    AND fr.team1_penalty > fr.team2_penalty THEN 'team1'
+               WHEN fr.team1_penalty IS NOT NULL AND fr.team2_penalty IS NOT NULL
+                    AND fr.team1_penalty < fr.team2_penalty THEN 'team2'
                ELSE 'draw'
              END AS actual
       FROM   fixture_results fr

@@ -52,12 +52,17 @@ CREATE TABLE fixtures (
 );
 
 -- Fixtures (no-update) (inserted when the match is completed)
+-- team{1,2}_score is the score at the end of regulation/extra time. For matches
+-- decided by a penalty shootout (status_short = 'PEN') those scores are level and
+-- team{1,2}_penalty hold the shootout result (NULL for non-shootout matches).
 CREATE TABLE fixture_results (
     fixture_result_id BIGINT      DEFAULT generate_id() PRIMARY KEY,
     fixture_id        BIGINT      NOT NULL UNIQUE REFERENCES fixtures(fixture_id),
     status_short      TEXT        NOT NULL CHECK (status_short IN ('FT', 'AET', 'PEN')),
     team1_score       INTEGER     NOT NULL CHECK (team1_score >= 0),
-    team2_score       INTEGER     NOT NULL CHECK (team2_score >= 0)
+    team2_score       INTEGER     NOT NULL CHECK (team2_score >= 0),
+    team1_penalty     INTEGER     CHECK (team1_penalty >= 0),
+    team2_penalty     INTEGER     CHECK (team2_penalty >= 0)
 );
 
 -- Live results for fixtures, updated frequently during matches (updateable)

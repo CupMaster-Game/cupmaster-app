@@ -36,6 +36,8 @@ const FINISHED_STATUSES = new Set(['FT', 'AET', 'PEN']);
 interface ApiLiveFixture {
   fixture: { id: number; status: { short: string } };
   goals: { home: number | null; away: number | null };
+  // score.penalty holds the shootout result for PEN matches; null otherwise.
+  score: { penalty: { home: number | null; away: number | null } };
 }
 
 async function fetchApiFixturesByIds(ids: number[]): Promise<ApiLiveFixture[]> {
@@ -101,15 +103,24 @@ export async function runFetchLiveResultsJob(): Promise<void> {
       }
 
       if (FINISHED_STATUSES.has(apiStatus)) {
+        // Only shootout-decided matches carry a penalty score.
+        const team1Penalty = apiStatus === 'PEN' ? (fx.score.penalty.home ?? null) : null;
+        const team2Penalty = apiStatus === 'PEN' ? (fx.score.penalty.away ?? null) : null;
         const inserted = await insertFixtureResultIfAbsent(
           fixtureId,
           apiStatus,
           team1Score,
-          team2Score
+          team2Score,
+          team1Penalty,
+          team2Penalty
         );
         if (inserted) {
+          const penaltySuffix =
+            team1Penalty !== null && team2Penalty !== null
+              ? ` (pens ${String(team1Penalty)}-${String(team2Penalty)})`
+              : '';
           console.log(
-            `fetch-live-results: fixture ${String(fx.fixture.id)} FINAL ${apiStatus} ${String(team1Score)}-${String(team2Score)}`
+            `fetch-live-results: fixture ${String(fx.fixture.id)} FINAL ${apiStatus} ${String(team1Score)}-${String(team2Score)}${penaltySuffix}`
           );
         }
       }

@@ -44,6 +44,12 @@ async function fetchApiFixtures(): Promise<ApiFixtureEntry[]> {
  * Fetches the World Cup 2026 fixture list from api-football and inserts any
  * fixture not already in the `fixtures` table. Matching to match_schedules
  * is by (match_time, venue_city); team IDs are resolved via teams.api_team_id.
+ *
+ * Fixtures are insert-only: a fixture's two teams don't change once set, and
+ * knockout slots are simply inserted when their teams are first resolved. If
+ * the API ever reports different teams for a fixture we've already stored we
+ * log a warning (and leave the stored row untouched) rather than silently
+ * diverging.
  */
 export async function runFetchFixturesJob(): Promise<void> {
   const apiFixtures = await fetchApiFixtures();
@@ -55,21 +61,34 @@ export async function runFetchFixturesJob(): Promise<void> {
 
   let inserted = 0;
   for (const fx of apiFixtures) {
-    if (existingIds.has(fx.fixture.id)) {
-      continue;
-    }
-
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     if (!(fx.teams?.away?.id > 0 && fx.teams?.home?.id)) {
-      continue;
+      continue; // teams not decided yet (unresolved knockout slot)
     }
 
     const apiFixtureId = String(fx.fixture.id);
-    // const venueCity = resolveVenueCity(fx);
-    // if (!venueCity) {
-    //   console.warn(`fetch-fixtures: fixture ${apiFixtureId} has no resolvable venue city`);
-    //   continue;
-    // }
+
+    if (existingIds.has(fx.fixture.id)) {
+      // Already stored — warn if the API now reports different teams (a data
+      // correction or home/away swap), since we deliberately don't update.
+      const sameTeams = await sql`
+        SELECT 1
+        FROM   fixtures f
+        JOIN   teams t1 ON t1.team_id = f.team1_id
+        JOIN   teams t2 ON t2.team_id = f.team2_id
+        WHERE  f.api_fixture_id = ${fx.fixture.id}
+        AND    t1.api_team_id = ${fx.teams.home.id}
+        AND    t2.api_team_id = ${fx.teams.away.id}
+      `;
+      if (sameTeams.length === 0) {
+        console.warn(
+          `fetch-fixtures: fixture ${apiFixtureId} teams changed on the API ` +
+            `(home=${String(fx.teams.home.id)} away=${String(fx.teams.away.id)}); ` +
+            `leaving stored teams unchanged`
+        );
+      }
+      continue;
+    }
 
     const rows = await sql<{ match_number: number }[]>`
       INSERT INTO fixtures (api_fixture_id, match_number, team1_id, team2_id)

@@ -25,6 +25,10 @@ export interface FixtureView {
   team2: FixtureTeamInfo | null;
   team1_score: number | null;
   team2_score: number | null;
+  // Penalty-shootout score for knockout matches decided on penalties
+  // (status_short = 'PEN'); null otherwise.
+  team1_penalty: number | null;
+  team2_penalty: number | null;
 }
 
 interface QueryRow {
@@ -48,6 +52,8 @@ interface QueryRow {
   final_status_short: string | null;
   final_team1_score: number | null;
   final_team2_score: number | null;
+  final_team1_penalty: number | null;
+  final_team2_penalty: number | null;
   live_status_short: string | null;
   live_team1_score: number | null;
   live_team2_score: number | null;
@@ -88,6 +94,8 @@ async function fetchAllFixtures(): Promise<FixtureView[]> {
            fr.status_short   AS final_status_short,
            fr.team1_score    AS final_team1_score,
            fr.team2_score    AS final_team2_score,
+           fr.team1_penalty  AS final_team1_penalty,
+           fr.team2_penalty  AS final_team2_penalty,
            flr.status_short  AS live_status_short,
            flr.team1_score   AS live_team1_score,
            flr.team2_score   AS live_team2_score
@@ -136,6 +144,8 @@ async function fetchAllFixtures(): Promise<FixtureView[]> {
       ),
       team1_score,
       team2_score,
+      team1_penalty: isFinished ? r.final_team1_penalty : null,
+      team2_penalty: isFinished ? r.final_team2_penalty : null,
     };
   });
 }
@@ -204,11 +214,15 @@ export async function insertFixtureResultIfAbsent(
   fixtureId: string,
   statusShort: string,
   team1Score: number,
-  team2Score: number
+  team2Score: number,
+  team1Penalty: number | null,
+  team2Penalty: number | null
 ): Promise<boolean> {
   const rows = await sql`
-    INSERT INTO fixture_results (fixture_id, status_short, team1_score, team2_score)
-    VALUES (${fixtureId}, ${statusShort}, ${team1Score}, ${team2Score})
+    INSERT INTO fixture_results
+      (fixture_id, status_short, team1_score, team2_score, team1_penalty, team2_penalty)
+    VALUES
+      (${fixtureId}, ${statusShort}, ${team1Score}, ${team2Score}, ${team1Penalty}, ${team2Penalty})
     ON CONFLICT (fixture_id) DO NOTHING
     RETURNING fixture_id
   `;
