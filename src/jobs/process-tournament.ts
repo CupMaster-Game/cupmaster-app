@@ -2,15 +2,19 @@ import crypto from 'node:crypto';
 import { encodePacked, formatUnits, keccak256, parseUnits, toBytes, toHex } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import config from '../config.ts';
-import { TOURNAMENT_PAYOUT_TOKEN_ID, MIN_PAYOUT_THRESHOLD_USDT, PAYMENT_TOKENS } from '../constants.ts';
+import {
+  MIN_PAYOUT_THRESHOLD_USDT,
+  PAYMENT_TOKENS,
+  TOURNAMENT_PAYOUT_TOKEN_ID,
+} from '../constants.ts';
 import { withTransaction } from '../db/index.ts';
 import {
-  fetchTournamentRevenue,
   fetchPreviousTournamentResult,
   fetchTopRankedPlayers,
+  fetchTournamentRevenue,
   findOldestUnprocessedTournament,
-  insertTournamentTotalScores,
   insertTournamentResult,
+  insertTournamentTotalScores,
   insertUserPayouts,
   type PayoutInsert,
   type RankedPlayerRow,

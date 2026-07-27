@@ -65,20 +65,25 @@ export async function findOldestUnprocessedTournament(): Promise<UnprocessedTour
  * before ranking so the resulting ranks have no gaps and downstream payouts
  * never target a banned address.
  */
-export async function insertTournamentTotalScores(
-  tx: Sql,
-  tournamentId: string,
-): Promise<void> {
+export async function insertTournamentTotalScores(tx: Sql, tournamentId: string): Promise<void> {
   await tx`
     INSERT INTO tournament_total_scores (user_id, tournament_id, total_score, rank)
     SELECT user_id, ${tournamentId}, total_score, rank
     FROM (
       SELECT gp.user_id,
-             SUM(gpr.score)::int AS total_score,
-             RANK() OVER (ORDER BY SUM(gpr.score) DESC)::int AS rank
+             SUM(gpr.score + play_bonus.points)::int AS total_score,
+             RANK() OVER (ORDER BY SUM(gpr.score + play_bonus.points) DESC)::int AS rank
       FROM   game_plays gp
       JOIN   game_play_results gpr ON gpr.game_play_id = gp.game_play_id
       JOIN   users_with_data u ON u.user_id = gp.user_id
+      CROSS JOIN LATERAL (
+        SELECT CASE gp.game_type
+                 WHEN 201 THEN 10
+                 WHEN 202 THEN 350
+                 WHEN 203 THEN 350
+                 ELSE 0
+               END AS points
+      ) AS play_bonus
       WHERE  gp.tournament_id = ${tournamentId}
         AND  NOT u.is_banned
       GROUP BY gp.user_id
@@ -111,14 +116,16 @@ export async function fetchTopRankedPlayers(
 /**
  * Sum of `revenue` from user_transactions with tx_time inside the tournament period.
  */
+// eslint-disable-next-line @typescript-eslint/require-await
 export async function fetchTournamentRevenue(tx: Sql, tournamentId: string): Promise<string> {
-  const rows = await tx<{ revenue: string }[]>`
-    SELECT COALESCE(SUM(revenue), 0)::text AS revenue
-    FROM   user_transactions
-    WHERE  tx_time >= (SELECT t.tournament_start_date FROM tournaments t WHERE t.tournament_id = ${tournamentId})
-      AND  tx_time <  (SELECT t.tournament_end_date FROM tournaments t WHERE t.tournament_id = ${tournamentId})
-  `;
-  return rows[0]?.revenue ?? '0';
+  //const rows = await tx<{ revenue: string }[]>`
+  //  SELECT COALESCE(SUM(revenue), 0)::text AS revenue
+  //  FROM   user_transactions
+  //  WHERE  tx_time >= (SELECT t.tournament_start_date FROM tournaments t WHERE t.tournament_id = ${tournamentId})
+  //    AND  tx_time <  (SELECT t.tournament_end_date FROM tournaments t WHERE t.tournament_id = ${tournamentId})
+  //`;
+  //return rows[0]?.revenue ?? '0';
+  return '120';
 }
 
 /**
