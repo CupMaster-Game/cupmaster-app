@@ -130,3 +130,17 @@ export interface Reward {
   amount: number;
   unit: 'PTS' | 'NFT' | 'TOKEN';
 }
+
+// Mirror of the backend PendingPayoutRow (GET /user → pending_claims). An
+// unclaimed on-chain reward the user can claim from the CupMasterGame contract.
+export interface PendingClaim {
+  payout_id: string;
+  payout_type: string;
+  // Hex-encoded action id used as the contract claim identifier.
+  action_id: string;
+  // Token amount in the payment token's smallest unit (stringified bigint).
+  amount: string;
+  // Key into PAYMENT_TOKENS (1 = USDT, 2 = USDC, 3 = USDm).
+  payment_token: number;
+  signature: string;
+}

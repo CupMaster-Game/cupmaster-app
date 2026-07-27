@@ -1,14 +1,8 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useState,
-  type ReactNode,
-} from 'react';
-import { useAccount, useWalletClient } from 'wagmi';
-import { useWalletInfo } from '@reown/appkit/react';
 import { api, getAuthedApi, tokenKey } from '@/lib/api';
+import type { PendingClaim } from '@/types';
+import { useWalletInfo } from '@reown/appkit/react';
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
+import { useAccount, useWalletClient } from 'wagmi';
 
 // authStatus values:
 // - loading:        checking wallet/token state
@@ -16,12 +10,7 @@ import { api, getAuthedApi, tokenKey } from '@/lib/api';
 // - signed_in:      JWT valid, user data loaded
 // - registered:     wallet connected, user exists but no valid JWT
 // - not_registered: wallet connected, user not registered
-export type AuthStatus =
-  | 'loading'
-  | 'no_wallet'
-  | 'signed_in'
-  | 'registered'
-  | 'not_registered';
+export type AuthStatus = 'loading' | 'no_wallet' | 'signed_in' | 'registered' | 'not_registered';
 
 // Mirror of the GET /user response shape — kept as a manual interface so the
 // page tree can render even before sign-in / before backend types are inferred.
@@ -39,6 +28,7 @@ export interface AuthedUser {
     total_score: number;
     global_rank: number | null;
   };
+  pending_claims: PendingClaim[];
 }
 
 interface AuthContextValue {
@@ -55,8 +45,7 @@ interface AuthContextValue {
 
 function isMiniPay(): boolean {
   if (typeof window === 'undefined') return false;
-  const eth = (window as unknown as { ethereum?: { isMiniPay?: boolean } })
-    .ethereum;
+  const eth = (window as unknown as { ethereum?: { isMiniPay?: boolean } }).ethereum;
   return !!eth?.isMiniPay;
 }
 
@@ -81,10 +70,7 @@ function buildSiweMessage(address: string, chainId: number, nonce: string): stri
 }
 
 function describeWalletInfo(
-  walletInfo:
-    | { name?: string; type?: string }
-    | null
-    | undefined,
+  walletInfo: { name?: string; type?: string } | null | undefined
 ): string {
   if (!walletInfo) return '';
   const name = walletInfo.name ?? '';
@@ -226,9 +212,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             ? 'mobile-web'
             : 'web';
         const connectorId = connector?.id ?? 'unknown';
-        const wallet_info = minipay
-          ? 'minipay'
-          : `${connectorId}${describeWalletInfo(walletInfo)}`;
+        const wallet_info = minipay ? 'minipay' : `${connectorId}${describeWalletInfo(walletInfo)}`;
 
         const signupRes = await api.auth.signup.$post({
           json: { message, signature, name, flag, user_source, wallet_info },
@@ -251,7 +235,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setAuthError(err instanceof Error ? err.message : 'Sign up failed');
       }
     },
-    [walletClient, address, connector, walletInfo],
+    [walletClient, address, connector, walletInfo]
   );
 
   const signOut = useCallback(() => {
@@ -264,9 +248,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const checkName = useCallback(async (name: string) => {
     try {
       const res = await api.auth.checkname.$get({ query: { name } });
-      const data = (await res.json()) as
-        | { available: boolean }
-        | { error: string };
+      const data = (await res.json()) as { available: boolean } | { error: string };
       return 'available' in data ? data.available : false;
     } catch {
       return false;

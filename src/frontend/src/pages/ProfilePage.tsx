@@ -1,7 +1,7 @@
 import { BadgeRow } from '@/components/profile/BadgeRow';
 import { EditProfileModal } from '@/components/profile/EditProfileModal';
+import { PendingClaims } from '@/components/profile/PendingClaims';
 import { ProfileHeader } from '@/components/profile/ProfileHeader';
-import { RewardsList } from '@/components/profile/RewardsList';
 import { Card } from '@/components/ui/Card';
 import { BADGE_LADDERS } from '@/data/user';
 import { useAuth } from '@/hooks/useAuth';
@@ -64,10 +64,10 @@ export function ProfilePage() {
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-lg font-bold">Rewards</h2>
-            <p className="text-xs text-text-muted">Claim points and prizes you've earned.</p>
+            <p className="text-xs text-text-muted">Claim the prizes you've earned.</p>
           </div>
         </div>
-        <RewardsList />
+        <PendingClaims />
       </section>
 
       <section className="space-y-3 hidden">
