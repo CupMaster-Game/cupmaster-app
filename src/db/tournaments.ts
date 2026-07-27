@@ -66,9 +66,19 @@ export async function findOldestUnprocessedTournament(): Promise<UnprocessedTour
  * never target a banned address.
  */
 export async function insertTournamentTotalScores(tx: Sql, tournamentId: string): Promise<void> {
+  // We assign tournament_score_id explicitly instead of relying on the
+  // generate_id() column default. That default calls generate_id() once per row,
+  // and every row of this bulk insert lands in the same millisecond, so they
+  // share the 42-bit timestamp and differ only in 21 random bits — a birthday
+  // collision on the PK becomes likely as the user count grows. Here we keep the
+  // k-ordered timestamp in the high bits but fill the low 21 bits from a single
+  // per-batch random base plus a ROW_NUMBER(), which is collision-free within the
+  // batch (up to 2^21 users) and stays unique across batches via the random base.
   await tx`
-    INSERT INTO tournament_total_scores (user_id, tournament_id, total_score, rank)
-    SELECT user_id, ${tournamentId}, total_score, rank
+    INSERT INTO tournament_total_scores (tournament_score_id, user_id, tournament_id, total_score, rank)
+    SELECT (b.base_ms << 21)
+           | ((b.base_rand + ROW_NUMBER() OVER (ORDER BY t.total_score DESC, t.user_id) - 1) & 2097151),
+           t.user_id, ${tournamentId}, t.total_score, t.rank
     FROM (
       SELECT gp.user_id,
              SUM(gpr.score + play_bonus.points)::int AS total_score,
@@ -88,11 +98,15 @@ export async function insertTournamentTotalScores(tx: Sql, tournamentId: string)
         AND  NOT u.is_banned
       GROUP BY gp.user_id
     ) t
+    CROSS JOIN (
+      SELECT (EXTRACT(EPOCH FROM clock_timestamp()) * 1000)::bigint & x'3ffffffffff'::bigint AS base_ms,
+             floor(random() * 2097152)::bigint AS base_rand
+    ) b
   `;
 }
 
 /**
- * Top 50 ranked players for the given tournament date, joined with their
+ * Top 25 ranked players for the given tournament date, joined with their
  * on-chain address. Order by rank ascending, ties broken by user_id for a
  * deterministic order.
  */
@@ -108,7 +122,7 @@ export async function fetchTopRankedPlayers(
     FROM   tournament_total_scores dts
     JOIN   users u ON u.user_id = dts.user_id
     WHERE  dts.tournament_id = ${tournamentId}
-      AND  dts.rank <= 50
+      AND  dts.rank <= 25
     ORDER BY dts.rank, dts.user_id
   `;
 }
@@ -116,16 +130,14 @@ export async function fetchTopRankedPlayers(
 /**
  * Sum of `revenue` from user_transactions with tx_time inside the tournament period.
  */
-// eslint-disable-next-line @typescript-eslint/require-await
 export async function fetchTournamentRevenue(tx: Sql, tournamentId: string): Promise<string> {
-  //const rows = await tx<{ revenue: string }[]>`
-  //  SELECT COALESCE(SUM(revenue), 0)::text AS revenue
-  //  FROM   user_transactions
-  //  WHERE  tx_time >= (SELECT t.tournament_start_date FROM tournaments t WHERE t.tournament_id = ${tournamentId})
-  //    AND  tx_time <  (SELECT t.tournament_end_date FROM tournaments t WHERE t.tournament_id = ${tournamentId})
-  //`;
-  //return rows[0]?.revenue ?? '0';
-  return '120';
+  const rows = await tx<{ revenue: string }[]>`
+    SELECT COALESCE(SUM(revenue), 0)::text AS revenue
+    FROM   user_transactions
+    WHERE  tx_time >= (SELECT t.tournament_start_date FROM tournaments t WHERE t.tournament_id = ${tournamentId})
+      AND  tx_time <  (SELECT t.tournament_end_date FROM tournaments t WHERE t.tournament_id = ${tournamentId})
+  `;
+  return rows[0]?.revenue ?? '0';
 }
 
 /**
@@ -144,7 +156,7 @@ export async function fetchPreviousTournamentResult(
     FROM   tournaments dt
     JOIN   tournament_results dtr ON dtr.tournament_id = dt.tournament_id
     WHERE  dt.tournament_id < ${tournamentId}
-    ORDER BY dt.tournament_date DESC
+    ORDER BY dt.tournament_start_date DESC
     LIMIT 1
   `;
   return rows[0] ?? null;

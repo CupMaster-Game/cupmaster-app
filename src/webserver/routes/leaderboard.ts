@@ -1,11 +1,8 @@
 import { Hono } from 'hono';
-import {
-  getCachedLeaderboards,
-  type LeaderboardEntry,
-} from '../../db/leaderboard.ts';
+import { getCachedLeaderboards, type LeaderboardEntry } from '../../db/leaderboard.ts';
 import { authMiddleware, type AuthEnv } from '../middleware/auth.ts';
 
-const TOP_N = 50;
+const TOP_N = 25;
 
 function findMyRank<T extends LeaderboardEntry>(list: T[], userId: string): T | null {
   return list.find((e) => e.user_id === userId) ?? null;
