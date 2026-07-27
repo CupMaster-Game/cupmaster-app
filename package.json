@@ -15,7 +15,8 @@
     "format": "prettier --write \"src/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\"",
     "generate:world-cup-data": "node --experimental-strip-types scripts/generate-world-cup-data.ts",
-    "backfill:penalties": "node --experimental-strip-types scripts/backfill-penalties.ts"
+    "backfill:penalties": "node --experimental-strip-types scripts/backfill-penalties.ts",
+    "process:standings-knockout-predictions": "node --experimental-strip-types scripts/process-standings-knockout-predictions.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

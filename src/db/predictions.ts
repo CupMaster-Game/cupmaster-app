@@ -13,6 +13,12 @@ const POINTS_BY_GAME_TYPE: Record<201 | 202 | 203, number> = {
   [GAME_TYPE_KNOCKOUT_PREDICTION]: 350,
 };
 
+// Result-scoring rewards (awarded when predictions are resolved against actual
+// results). Match predictions use an inline 30 in processFinishedMatchPredictions.
+const POINTS_PER_CORRECT_STANDING = 30; // group: per correctly placed team
+const POINTS_PER_CORRECT_KNOCKOUT_MATCH = 30; // knockout: per correct match winner
+const POINTS_FOR_CORRECT_CHAMPION = 100; // knockout: bonus for the correct champion
+
 export type MatchOutcome = 'team1' | 'team2' | 'draw';
 
 export interface MatchPredictionData {
@@ -284,6 +290,177 @@ export async function processFinishedMatchPredictions(): Promise<number> {
       FROM   agg
       WHERE  un.user_id = agg.user_id
         AND  un.game_type = ${GAME_TYPE_MATCH_PREDICTION}
+      RETURNING un.user_id
+    )
+    SELECT count(*)::int AS processed FROM inserted
+  `;
+  return rows[0]?.processed ?? 0;
+}
+
+/**
+ * Resolves group-standings predictions (game_type 202) against the final group
+ * standings. For every group prediction game_play with no result yet, this:
+ *   - takes the latest submitted standings,
+ *   - awards 30 points for every team whose predicted position within its group
+ *     (its 1-based index in ordered_teams) matches its actual team_standings.rank,
+ *   - inserts a game_play_results row and bumps the user's total_score.
+ *
+ * Meant to be run manually after the group stage is complete (team_standings are
+ * final) — running earlier would lock in scores against partial standings. The
+ * ON CONFLICT guard keeps re-runs idempotent. Returns the number of predictions
+ * newly resolved.
+ */
+export async function processGroupPredictions(): Promise<number> {
+  const rows = await sql<{ processed: number }[]>`
+    WITH candidate AS (
+      -- Latest submitted standings per unresolved group-prediction game_play.
+      SELECT DISTINCT ON (gp.game_play_id)
+             gp.game_play_id,
+             gp.user_id,
+             ga.extra_data
+      FROM   game_plays gp
+      JOIN   game_actions ga
+             ON ga.game_play_id = gp.game_play_id
+            AND ga.action_type = 'submit_prediction'
+      WHERE  gp.game_type = ${GAME_TYPE_GROUP_PREDICTION}
+        AND  NOT EXISTS (
+               SELECT 1 FROM game_play_results r
+               WHERE  r.game_play_id = gp.game_play_id
+             )
+      ORDER BY gp.game_play_id, ga.game_action_id DESC
+    ),
+    scored AS (
+      SELECT c.game_play_id,
+             c.user_id,
+             (
+               -- Count teams placed at their actual rank, 30 points each.
+               SELECT count(*) * ${POINTS_PER_CORRECT_STANDING}
+               FROM   jsonb_array_elements(c.extra_data->'standings') AS grp
+               CROSS JOIN LATERAL
+                    jsonb_array_elements_text(grp->'ordered_teams')
+                    WITH ORDINALITY AS ot(team_id, predicted_rank)
+               JOIN   team_standings ts
+                      ON ts.team_id = ot.team_id::bigint
+                     AND ts.rank    = ot.predicted_rank
+             )::int AS score
+      FROM   candidate c
+    ),
+    inserted AS (
+      INSERT INTO game_play_results (game_play_id, score)
+      SELECT game_play_id, score FROM scored
+      ON CONFLICT (game_play_id) DO NOTHING
+      RETURNING game_play_id, score
+    ),
+    agg AS (
+      SELECT s.user_id, SUM(i.score)::bigint AS total
+      FROM   inserted i
+      JOIN   scored s ON s.game_play_id = i.game_play_id
+      GROUP BY s.user_id
+    ),
+    updated AS (
+      UPDATE user_numbers un
+      SET    total_score = total_score + agg.total
+      FROM   agg
+      WHERE  un.user_id = agg.user_id
+        AND  un.game_type = ${GAME_TYPE_GROUP_PREDICTION}
+      RETURNING un.user_id
+    )
+    SELECT count(*)::int AS processed FROM inserted
+  `;
+  return rows[0]?.processed ?? 0;
+}
+
+/**
+ * Resolves knockout-bracket predictions (game_type 203) against the finished
+ * knockout fixtures. For every knockout prediction game_play with no result yet,
+ * this:
+ *   - takes the latest submitted match_results,
+ *   - awards 30 points for every match whose predicted winner matches the actual
+ *     winner (regulation, extra time, or penalty shootout),
+ *   - awards a further 100 points when the predicted winner of the final (the
+ *     last knockout match) is the actual champion,
+ *   - inserts a game_play_results row and bumps the user's total_score.
+ *
+ * Meant to be run manually once knockout results are in. Only matches that have
+ * a fixture_results row are scored, so it can be run repeatedly as more rounds
+ * finish — but each game_play is scored only once (ON CONFLICT guard), against
+ * whatever results exist at that moment. Returns the number newly resolved.
+ */
+export async function processKnockoutPredictions(): Promise<number> {
+  const rows = await sql<{ processed: number }[]>`
+    WITH final_match AS (
+      -- The final is the last knockout match (the 3rd-place playoff, if any, has
+      -- a lower match_number). Its winner is the champion.
+      SELECT max(match_number) AS match_number
+      FROM   match_schedules
+      WHERE  round_type = 'knockout'
+    ),
+    winners AS (
+      -- Actual winner team_id for each finished knockout match.
+      SELECT f.match_number,
+             CASE
+               WHEN fr.team1_score > fr.team2_score THEN f.team1_id
+               WHEN fr.team1_score < fr.team2_score THEN f.team2_id
+               WHEN fr.team1_penalty > fr.team2_penalty THEN f.team1_id
+               ELSE f.team2_id
+             END AS winner_team_id
+      FROM   fixture_results fr
+      JOIN   fixtures f ON f.fixture_id = fr.fixture_id
+      JOIN   match_schedules ms ON ms.match_number = f.match_number
+      WHERE  ms.round_type = 'knockout'
+    ),
+    candidate AS (
+      -- Latest submitted match_results per unresolved knockout-prediction game_play.
+      SELECT DISTINCT ON (gp.game_play_id)
+             gp.game_play_id,
+             gp.user_id,
+             ga.extra_data
+      FROM   game_plays gp
+      JOIN   game_actions ga
+             ON ga.game_play_id = gp.game_play_id
+            AND ga.action_type = 'submit_prediction'
+      WHERE  gp.game_type = ${GAME_TYPE_KNOCKOUT_PREDICTION}
+        AND  NOT EXISTS (
+               SELECT 1 FROM game_play_results r
+               WHERE  r.game_play_id = gp.game_play_id
+             )
+      ORDER BY gp.game_play_id, ga.game_action_id DESC
+    ),
+    scored AS (
+      SELECT c.game_play_id,
+             c.user_id,
+             (
+               SELECT COALESCE(SUM(
+                        CASE WHEN w.winner_team_id = (pred->>'winner_team_id')::bigint
+                             THEN ${POINTS_PER_CORRECT_KNOCKOUT_MATCH} ELSE 0 END
+                      + CASE WHEN (pred->>'match_number')::int = fm.match_number
+                              AND w.winner_team_id = (pred->>'winner_team_id')::bigint
+                             THEN ${POINTS_FOR_CORRECT_CHAMPION} ELSE 0 END
+                      ), 0)::int
+               FROM   jsonb_array_elements(c.extra_data->'match_results') AS pred
+               JOIN   winners w ON w.match_number = (pred->>'match_number')::int
+               CROSS JOIN final_match fm
+             ) AS score
+      FROM   candidate c
+    ),
+    inserted AS (
+      INSERT INTO game_play_results (game_play_id, score)
+      SELECT game_play_id, score FROM scored
+      ON CONFLICT (game_play_id) DO NOTHING
+      RETURNING game_play_id, score
+    ),
+    agg AS (
+      SELECT s.user_id, SUM(i.score)::bigint AS total
+      FROM   inserted i
+      JOIN   scored s ON s.game_play_id = i.game_play_id
+      GROUP BY s.user_id
+    ),
+    updated AS (
+      UPDATE user_numbers un
+      SET    total_score = total_score + agg.total
+      FROM   agg
+      WHERE  un.user_id = agg.user_id
+        AND  un.game_type = ${GAME_TYPE_KNOCKOUT_PREDICTION}
       RETURNING un.user_id
     )
     SELECT count(*)::int AS processed FROM inserted
