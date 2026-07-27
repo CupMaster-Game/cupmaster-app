@@ -70,7 +70,7 @@ export function ProfilePage() {
         <RewardsList />
       </section>
 
-      <section className="space-y-3">
+      <section className="space-y-3 hidden">
         <div className="flex items-end justify-between">
           <div>
             <h2 className="text-lg font-bold">Badges</h2>
