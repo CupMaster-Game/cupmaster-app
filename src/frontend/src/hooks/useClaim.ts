@@ -1,4 +1,5 @@
 import { getAuthedApi } from '@/lib/api';
+import { ATTRIBUTION_SUFFIX } from '@/lib/attribution';
 import cupmasterGameAbi from '@backend/abis/cupmaster-game.abi';
 import { CUPMASTER_GAME_ADDRESS, PAYMENT_TOKENS } from '@backend/constants';
 import type { PendingClaim } from '@/types';
@@ -86,6 +87,7 @@ export function useClaim() {
             BigInt(pendingClaim.amount),
             pendingClaim.signature as `0x${string}`,
           ],
+          dataSuffix: ATTRIBUTION_SUFFIX,
         });
 
         setClaimStatus('confirming');

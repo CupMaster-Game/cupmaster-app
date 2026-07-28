@@ -1,4 +1,5 @@
 import { getAuthedApi } from '@/lib/api';
+import { ATTRIBUTION_SUFFIX } from '@/lib/attribution';
 import cupmasterGameAbi from '@backend/abis/cupmaster-game.abi';
 import erc20Abi from '@backend/abis/erc20.abi';
 import { CUPMASTER_GAME_ADDRESS, PAYMENT_TOKENS, type GameTypeId } from '@backend/constants';
@@ -157,6 +158,7 @@ export function usePlayGame() {
             abi: erc20Abi,
             functionName: 'approve',
             args: [GAME_ADDRESS, approvalAmount],
+            dataSuffix: ATTRIBUTION_SUFFIX,
           });
           setTxStatus('confirming');
           const approveReceipt = await waitForReceiptResilient(publicClient, approveTxHash);
@@ -172,6 +174,7 @@ export function usePlayGame() {
           abi: cupmasterGameAbi,
           functionName: 'buy',
           args: [BigInt(gameType), selectedAddr],
+          dataSuffix: ATTRIBUTION_SUFFIX,
         });
         setTxStatus('confirming');
         const buyReceipt = await waitForReceiptResilient(publicClient, buyTxHash);
